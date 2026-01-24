@@ -40,21 +40,28 @@ async function refresh() {
   try {
     const teamsPath = `../data/${seasonId}/teams.csv`;
     const gamesPath = `../data/${seasonId}/games.csv`;
+    const schedPath = `../data/${seasonId}/schedule.csv`;
 
     teams = await loadCSV(teamsPath);
     const games = await loadCSV(gamesPath);
+    const schedule = await loadCSV(schedPath);
 
-    // Build conference filter options dynamically (free-text conferences)
     buildConferenceOptions(teams);
-
-    // Compute standings
-    standings = computeStandings(teams, games);
+    standings = computeStandings(teams, games, schedule);
 
     setLoading(false);
     render();
   } catch (err) {
     console.error(err);
-    setLoading(true, `Failed to load season data. Check paths and CSV formatting.`);
+
+    // Friendly UX message for missing seasons / missing files
+    if (isMissingSeasonDataError(err)) {
+      setLoading(true, `No data exists for Season ${seasonId}.`);
+    } else {
+      setLoading(true, `No data exists for Season ${seasonId}.`);
+      // (If you ever want a distinct "unexpected error" message, we can do it later.)
+    }
+
     elTable.hidden = true;
   }
 }
@@ -80,7 +87,15 @@ function buildConferenceOptions(teamRows) {
   if ([...elConf.options].some(o => o.value === current)) elConf.value = current;
 }
 
-function computeStandings(teamRows, gameRows) {
+function computeStandings(teamRows, gameRows, scheduleRows) {
+	// Map match_id → stage
+	const stageByMatch = new Map();
+	for (const s of scheduleRows) {
+		if (s.match_id && s.stage) {
+		stageByMatch.set(s.match_id.trim(), s.stage.trim().toLowerCase());
+		}
+	}
+
   // Index teams by team_id
   const tmap = new Map();
   for (const t of teamRows) {
@@ -113,6 +128,11 @@ function computeStandings(teamRows, gameRows) {
     const hg = toIntMaybe(g.home_goals);
     const ag = toIntMaybe(g.away_goals);
     const ot = toIntMaybe(g.ot) ?? 0;
+	const matchId = (g.match_id ?? "").trim();
+	const stage = stageByMatch.get(matchId);
+
+	// Only count regular season
+	if (stage !== "reg") continue;
 
     // If a "played" game row exists, goals should be present;
     // if not, skip safely.
@@ -223,6 +243,8 @@ function render() {
     img.src = `../logos/${seasonId}/${r.team_id}.png`;
     img.onerror = () => (img.style.visibility = "hidden");
     tdLogo.appendChild(img);
+	if (r.bg_color) tdLogo.style.backgroundColor = r.bg_color;
+	tdLogo.style.textAlign = "center";
 
     // Team cell (clickable)
     const tdTeam = document.createElement("td");
@@ -236,9 +258,6 @@ function render() {
     const tdConf = document.createElement("td");
     tdConf.textContent = r.conference ?? "";
 
-    // Optional: apply team colors (non-invasive)
-    if (r.bg_color) tdTeam.style.backgroundColor = r.bg_color;
-    if (r.text_color) tdTeam.style.color = r.text_color;
 
     tr.appendChild(tdLogo);
     tr.appendChild(tdTeam);
@@ -279,3 +298,15 @@ function setLoading(isLoading, msg = "") {
   elStatus.textContent = msg;
   elTable.hidden = isLoading;
 }
+
+function isMissingSeasonDataError(err) {
+  // loadCSV throws: "Failed to fetch <path> (HTTP <status>)" from data.js
+  const msg = String(err?.message ?? err ?? "");
+  const m = msg.match(/HTTP\s+(\d+)/i);
+  const status = m ? Number(m[1]) : null;
+
+  // Most common: 404 when season folder/files don't exist yet.
+  // Also treat any fetch failure as "no data" for user-facing message.
+  return status === 404 || status === 400 || status === 403 || status === 500 || status === null;
+}
+

@@ -9,6 +9,10 @@ body {
   color: #e7e7e7;
 }
 
+/* Ensure hidden works even when other rules set display:grid/flex */
+[hidden] { display: none !important; }
+
+
 .site-header {
   display: flex;
   align-items: center;
@@ -106,3 +110,116 @@ h1 {
   color: #b8c0cc;
   font-size: 12px;
 }
+/* --- Team page layout --- */
+.two-col {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: 14px;
+  margin-top: 14px;
+}
+
+@media (max-width: 950px) {
+  .two-col { grid-template-columns: 1fr; }
+}
+
+.card {
+  border: 1px solid #232a35;
+  border-radius: 12px;
+  background: #0f1319;
+  padding: 12px;
+}
+
+.card-title {
+  font-size: 20px;
+  font-weight: 750;
+  margin: 4px 0 10px;
+}
+
+.card-subtitle {
+  font-size: 12px;
+  color: #b8c0cc;
+  font-weight: 600;
+  margin-left: 8px;
+}
+
+.table-spacer { height: 12px; }
+
+/* --- Team hero --- */
+.team-hero {
+  border: 1px solid #232a35;
+  border-radius: 12px;
+  padding: 16px;
+  background: #0f1319;
+}
+
+.team-hero.team-themed {
+  background: var(--team-bg, #0f1319);
+  color: var(--team-fg, #e7e7e7);
+}
+
+.team-hero {
+  padding: 22px; /* bigger header */
+}
+
+.team-hero-left {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+}
+
+.team-hero-logo {
+  width: 128px;
+  height: 128px;
+  object-fit: contain;
+  border-radius: 14px;
+  background: rgba(0,0,0,0.15);
+  padding: 10px;
+}
+
+.team-hero-name {
+  margin: 0;
+  font-size: 48px;
+  line-height: 1.05;
+  font-weight: 800;
+}
+
+.team-hero-meta {
+  margin-top: 12px;
+  font-size: 16px;
+  font-weight: 600;
+  opacity: 0.95;
+}
+
+/* Team links that should inherit themed colors */
+.team-link-inherit {
+  color: inherit;
+  text-decoration: none;
+}
+
+.team-link-inherit:hover {
+  text-decoration: underline;
+}
+
+/* Force player hero team link to inherit team colors */
+.team-hero .team-link-inherit,
+.team-hero .team-link-inherit:visited {
+  color: inherit !important;
+  text-decoration: none;
+}
+
+.team-hero .team-link-inherit:hover {
+  text-decoration: underline;
+}
+
+.league-logo {
+  height: 100px;
+  width: auto;
+  display: block;
+}
+
+.site-header .brand {
+  display: flex;
+  align-items: center;
+}
+
+

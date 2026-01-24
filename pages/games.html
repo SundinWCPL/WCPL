@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+<head>
+<style>
+  /* Games page: make table geometry predictable */
+  #gamesTable { table-layout: fixed; }
+
+  #gamesTable td, #gamesTable th { vertical-align: middle; }
+
+  /* Override global logo-cell flex (tables.css) for this page only */
+  #gamesTable td.logo-cell{
+    display: table-cell !important;
+    padding: 0 !important;
+    text-align: center;
+  }
+
+  /* Center the VS column and the logo columns */
+  #gamesTable th:nth-child(2),
+  #gamesTable th:nth-child(3),
+  #gamesTable th:nth-child(4),
+  #gamesTable td:nth-child(2),
+  #gamesTable td:nth-child(3),
+  #gamesTable td:nth-child(4){
+    text-align: center;
+  }
+
+  /* Themed logo badge (color behind logo, not the whole cell) */
+  #gamesTable .logo-badge{
+    width: 110px;
+    height: 110px;
+    border-radius: 12px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgba(255,255,255,0.10);
+    background: #0f1319;
+  }
+
+  /* Bigger logo for games page */
+  #gamesTable .logo-badge img{
+    width: 100px;
+    height: 100px;
+    object-fit: contain;
+    display: block;
+  }
+
+  /* VS cell */
+  #gamesTable .vs-cell{
+    width: 56px;
+    padding: 0 !important;
+    color: #b8c0cc;
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.6px;
+  }
+
+  /* Keep Result from dominating */
+  #gamesTable .result-cell{
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  
+  #gamesTable .result-pill{
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.14);
+  font-weight: 800;
+  font-size: 14px;
+  letter-spacing: 0.2px;
+  white-space: nowrap;
+  min-width: 110px;
+}
+
+#gamesTable th:first-child,
+#gamesTable td:first-child,
+#gamesTable th:last-child,
+#gamesTable td:last-child {
+  text-align: center !important;
+}
+
+#gamesTable .spacer-col {
+  width: 60px;       
+  padding: 0 !important;
+}
+
+
+</style>
+
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>WCPL — Games</title>
+
+  <link rel="stylesheet" href="../css/main.css" />
+  <link rel="stylesheet" href="../css/tables.css" />
+</head>
+
+<body>
+  <header class="site-header">
+    <a class="brand" href="../index.html">
+  <img
+    src="../assets/wcpl_logo.png"
+    alt="WCPL"
+    class="league-logo"
+  />
+</a>
+
+
+    <nav class="nav">
+      <a href="teams.html">Teams</a>
+      <a href="players.html">Players</a>
+      <a class="active" href="games.html">Games</a>
+      <a href="standings.html">Standings</a>
+    </nav>
+
+    <div class="header-right">
+      <label class="season-picker">
+        <span>Season</span>
+        <select id="seasonSelect"></select>
+      </label>
+    </div>
+  </header>
+
+  <main class="page">
+    <h1>Games</h1>
+
+    <div id="status" class="status">Loading…</div>
+
+    <div class="table-wrap">
+  <table id="gamesTable" class="data-table" style="table-layout: fixed;" hidden>
+    <colgroup>
+      <col style="width: 60px;">  <!-- Week -->
+      <col style="width: 92px;">   <!-- Home logo -->
+      <col style="width: 56px;">   <!-- VS -->
+      <col style="width: 92px;">   <!-- Away logo -->
+	  <col class="spacer-col">    <!-- Spacer -->
+      <col style="width: 140px;">  <!-- Result -->
+      <col style="width: 140px;">  <!-- Date -->
+    </colgroup>
+
+<thead>
+  <tr>
+    <th class="left" style="width: 70px;">Week</th>
+    <th style="width: 92px;">Home</th>
+    <th style="width: 56px;"></th>
+    <th style="width: 92px;">Away</th>
+	<th class="spacer-col"></th>
+    <th style="width: 150px; text-align:center;">G1</th>
+    <th style="width: 150px; text-align:center;">G2</th>
+    <th style="width: 150px; text-align:center;">G3</th>
+    <th class="left" style="width: 140px;">Date</th>
+  </tr>
+</thead>
+<tbody></tbody>
+
+  </table>
+</div>
+
+    <p class="footnote">
+      Cancelled games are hidden. Scheduled games show <strong>TBD</strong>.
+    </p>
+  </main>
+
+  <script type="module" src="../js/games.js"></script>
+</body>
+</html>

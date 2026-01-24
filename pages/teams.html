@@ -8,17 +8,33 @@
   <link rel="stylesheet" href="../css/main.css" />
   <link rel="stylesheet" href="../css/tables.css" />
 </head>
-
+<style>
+#teamsTable th:nth-child(2),
+#teamsTable td:nth-child(2) {
+  width: 220px;
+  font-size: 14px;
+}
+#teamsTable .logo-cell .logo {
+    width: 60px;
+    height: 60px;
+  }
+</style>
 <body>
   <header class="site-header">
-    <a class="brand" href="../index.html">WCPL Stats</a>
+    <a class="brand" href="../index.html">
+  <img
+    src="../assets/wcpl_logo.png"
+    alt="WCPL"
+    class="league-logo"
+  />
+</a>
+
 
     <nav class="nav">
       <a class="active" href="teams.html">Teams</a>
       <a href="players.html">Players</a>
       <a href="games.html">Games</a>
       <a href="standings.html">Standings</a>
-      <a href="charts.html">Charts</a>
     </nav>
 
     <div class="header-right">

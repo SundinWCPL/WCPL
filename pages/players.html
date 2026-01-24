@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>WCPL — Players</title>
+
+  <link rel="stylesheet" href="../css/main.css" />
+  <link rel="stylesheet" href="../css/tables.css" />
+</head>
+
+<body>
+  <header class="site-header">
+    <a class="brand" href="../index.html">
+  <img
+    src="../assets/wcpl_logo.png"
+    alt="WCPL"
+    class="league-logo"
+  />
+</a>
+
+
+    <nav class="nav">
+      <a href="teams.html">Teams</a>
+      <a class="active" href="players.html">Players</a>
+      <a href="games.html">Games</a>
+      <a href="standings.html">Standings</a>
+    </nav>
+
+    <div class="header-right">
+      <label class="season-picker">
+        <span>Season</span>
+        <select id="seasonSelect"></select>
+      </label>
+    </div>
+  </header>
+
+  <main class="page">
+    <h1>Players</h1>
+
+    <section class="controls">
+      <label>
+        Position
+        <select id="posFilter">
+          <option value="SKATER">Skaters</option>
+          <option value="GOALIE">Goalies</option>
+        </select>
+      </label>
+
+      <label>
+        Team
+        <select id="teamFilter">
+          <option value="__ALL__">All</option>
+        </select>
+      </label>
+
+      <label>
+        Sort
+        <select id="sortSelect"></select>
+      </label>
+
+      <label class="search">
+        Search
+        <input id="playerSearch" type="search" placeholder="Player name / team…" />
+      </label>
+    </section>
+
+    <div id="status" class="status">Loading…</div>
+
+    <div class="table-wrap">
+      <table id="playersTable" class="data-table" hidden>
+        <thead>
+          <tr>
+            <th></th>
+            <th class="left">Player</th>
+            <th class="left">Pos</th>
+            <th class="left">Team</th>
+
+            <!-- Skater -->
+            <th class="num">GP(S)</th>
+            <th class="num">G</th>
+            <th class="num">A</th>
+            <th class="num">PTS</th>
+            <th class="num">P/GP</th>
+            <th class="num">S</th>
+            <th class="num">SH%</th>
+
+            <!-- Advanced (hide when adv_stats=0) -->
+            <th class="num adv">HIT</th>
+            <th class="num adv">TA</th>
+            <th class="num adv">TO</th>
+
+            <!-- Goalie -->
+            <th class="num">GP(G)</th>
+            <th class="num">SV%</th>
+            <th class="num">GAA</th>
+            <th class="num">W</th>
+            <th class="num">SO</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </main>
+
+  <script type="module" src="../js/players.js"></script>
+</body>
+</html>

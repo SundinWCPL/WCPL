@@ -33,11 +33,10 @@
   font-variant-numeric: tabular-nums;
 }
 
-.logo-cell { width: 34px; }
 
 .logo {
-  width: 22px;
-  height: 22px;
+  width: 34px;
+  height: 34px;
   object-fit: contain;
   display: block;
 }
@@ -53,3 +52,68 @@
 .data-table tr:hover td {
   background: rgba(255,255,255,0.03);
 }
+
+/* Team themed table headers */
+.team-themed + .two-col .data-table thead th,
+.team-themed .data-table thead th {
+  background: rgba(0,0,0,0.12);
+}
+
+/* Opponent cell with tiny logo */
+.opponent-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.opponent-logo {
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+}
+
+/* Result pills */
+.pill {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid #232a35;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.pill-w, .pill-otw { color: #8bbcff; }
+.pill-l { color: #ff8b8b; }
+.pill-otl { color: #ffd27a; }
+
+/* Hide advanced stats columns when season adv_stats=0 */
+.hide-adv th.adv,
+.hide-adv td.adv {
+  display: none;
+}
+
+/* Logo cells in tables (default: normal table-cell behavior) */
+.logo-cell {
+  width: 44px;
+  padding: 4px;
+  text-align: center;
+  vertical-align: middle;
+}
+
+
+/* Player/team logos in tables */
+.logo-cell .logo {
+  width: 42px;
+  height: 42px;
+  object-fit: contain;
+  display: block;
+  margin: 0 auto;
+}
+
+/* Optional: flex-centered logo cell for special layouts (Games page, etc.) */
+.logo-cell--flex {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+

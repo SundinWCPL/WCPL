@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>WCPL — Team</title>
+
+  <link rel="stylesheet" href="../css/main.css" />
+  <link rel="stylesheet" href="../css/tables.css" />
+</head>
+
+<body>
+  <header class="site-header">
+    <a class="brand" href="../index.html">
+  <img
+    src="../assets/wcpl_logo.png"
+    alt="WCPL"
+    class="league-logo"
+  />
+</a>
+
+
+    <nav class="nav">
+      <a href="teams.html">Teams</a>
+      <a href="players.html">Players</a>
+      <a href="games.html">Games</a>
+      <a href="standings.html">Standings</a>
+    </nav>
+
+    <div class="header-right">
+      <label class="season-picker">
+        <span>Season</span>
+        <select id="seasonSelect"></select>
+      </label>
+    </div>
+  </header>
+
+  <main class="page">
+    <div id="status" class="status">Loading…</div>
+
+    <!-- Team header card -->
+	<section id="teamHero" class="team-hero" hidden>
+	<div class="team-hero-left">
+		<img id="teamLogo" class="team-hero-logo" alt="Team logo" />
+		<div>
+		<h1 id="teamName" class="team-hero-name"></h1>
+		<div id="teamMeta" class="team-hero-meta"></div>
+		<div id="teamEmpty" class="status" hidden></div>
+		</div>
+	</div>
+	</section>
+
+    <!-- Two-column layout -->
+    <section id="teamBody" class="two-col">
+      <!-- Roster -->
+      <div class="card team-box">
+		<div class="card-title team-box-title">Roster</div>
+
+        <div class="table-wrap">
+          <table class="data-table" id="skatersTable">
+<thead>
+  <tr>
+    <th>Player</th>
+    <th class="left">Pos</th>
+    <th class="num">GP</th>
+    <th class="num">G</th>
+    <th class="num">A</th>
+    <th class="num">PTS</th>
+    <th class="num">P/GP</th>
+    <th class="num">S</th>
+    <th class="num">SH%</th>
+
+    <!-- Advanced (hide when adv_stats=0) -->
+    <th class="num adv">HIT</th>
+    <th class="num adv">TA</th>
+    <th class="num adv">TO</th>
+  </tr>
+</thead>
+            <tbody></tbody>
+          </table>
+        </div>
+
+        <div class="table-spacer"></div>
+
+        <div class="table-wrap">
+          <table class="data-table" id="goaliesTable">
+<thead>
+  <tr>
+    <th>Goalie</th>
+    <th class="left">Pos</th>
+    <th class="num">GP</th>
+    <th class="num">SA</th>
+    <th class="num">GA</th>
+    <th class="num">SV%</th>
+    <th class="num">GAA</th>
+    <th class="num">W</th>
+    <th class="num">SO</th>
+  </tr>
+</thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Match history -->
+      <div class="card team-box">
+		<div class="card-title team-box-title">
+			Match History <span class="card-subtitle">(Regular Season)</span>
+		</div>
+
+        <div class="table-wrap">
+          <table class="data-table" id="matchesTable">
+            <thead>
+              <tr>
+                <th class="num">Week</th>
+                <th>Opponent</th>
+                <th class="left">When</th>
+                <th class="num">Score</th>
+                <th class="left">Result</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+
+      </div>
+    </section>
+  </main>
+
+  <script type="module" src="../js/team.js"></script>
+</body>
+</html>

@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>WCPL — Standings</title>
+
+  <link rel="stylesheet" href="../css/main.css" />
+  <link rel="stylesheet" href="../css/tables.css" />
+</head>
+<style>
+#standingsTable th:nth-child(3),
+#standingsTable td:nth-child(3) {
+  width: 220px;
+  font-size: 14px;
+}
+#standingsTable .logo-cell .logo {
+    width: 60px;
+    height: 60px;
+  }
+</style>
+<body>
+  <header class="site-header">
+    <a class="brand" href="../index.html">
+  <img
+    src="../assets/wcpl_logo.png"
+    alt="WCPL"
+    class="league-logo"
+  />
+</a>
+
+
+    <nav class="nav">
+      <a href="teams.html">Teams</a>
+      <a href="players.html">Players</a>
+      <a href="games.html">Games</a>
+      <a class="active" href="standings.html">Standings</a>
+    </nav>
+
+    <div class="header-right">
+      <label class="season-picker">
+        <span>Season</span>
+        <select id="seasonSelect"></select>
+      </label>
+    </div>
+  </header>
+
+  <main class="page">
+    <h1>Standings</h1>
+
+    <section class="controls">
+      <label>
+        Conference
+        <select id="confFilter">
+          <option value="__ALL__">All</option>
+        </select>
+      </label>
+    </section>
+
+    <div id="status" class="status">Loading…</div>
+
+    <div class="table-wrap">
+      <table id="standingsTable" class="data-table" hidden>
+        <thead>
+          <tr>
+            <th class="num">RK</th>
+            <th></th>
+            <th class="left">Team</th>
+            <th class="left">Conference</th>
+            <th class="num">GP</th>
+            <th class="num">W</th>
+            <th class="num">OTW</th>
+            <th class="num">L</th>
+            <th class="num">OTL</th>
+            <th class="num">PTS</th>
+            <th class="num">GF</th>
+            <th class="num">GA</th>
+            <th class="num">DIFF</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <p class="footnote">
+      Points system: Reg W=3, OTW=2, OTL=1, Reg L=0. (Regular season only)
+    </p>
+  </main>
+
+  <script type="module" src="../js/standings.js"></script>
+</body>
+</html>

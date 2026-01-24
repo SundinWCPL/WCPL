@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>WCPL — Player</title>
+
+  <link rel="stylesheet" href="../css/main.css" />
+  <link rel="stylesheet" href="../css/tables.css" />
+</head>
+
+<body>
+  <header class="site-header">
+    <a class="brand" href="../index.html">
+  <img
+    src="../assets/wcpl_logo.png"
+    alt="WCPL"
+    class="league-logo"
+  />
+</a>
+
+
+    <nav class="nav">
+      <a href="teams.html">Teams</a>
+      <a href="players.html">Players</a>
+      <a href="games.html">Games</a>
+      <a href="standings.html">Standings</a>
+    </nav>
+
+    <div class="header-right">
+      <label class="season-picker">
+        <span>Season</span>
+        <select id="seasonSelect"></select>
+      </label>
+    </div>
+  </header>
+
+  <main class="page">
+    <div id="status" class="status">Loading…</div>
+
+    <!-- Player header card (reuses team hero styling for now) -->
+    <section id="playerHero" class="team-hero" hidden>
+      <div class="team-hero-left">
+        <a id="playerTeamLogoLink" href="#" aria-label="Team page">
+		<img id="playerTeamLogo" class="team-hero-logo" alt="Team logo" />
+		</a>
+        <div>
+          <h1 id="playerName" class="team-hero-name"></h1>
+          <div id="playerMeta" class="team-hero-meta"></div>
+          <div id="playerEmpty" class="status" hidden></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Body (hide on missing player / missing season) -->
+    <section id="playerBody" class="two-col">
+  <!-- LEFT: Stats card -->
+  <div class="card team-box">
+    <div class="card-title team-box-title">Skater Stats</div>
+    <div class="table-wrap">
+      <table class="data-table" id="skaterStatsTable">
+        <thead>
+          <tr>
+            <th class="left">Stat</th>
+            <th class="num">Value</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <div class="table-spacer"></div>
+
+    <div class="card-title team-box-title">Goalie Stats</div>
+    <div class="table-wrap">
+      <table class="data-table" id="goalieStatsTable">
+        <thead>
+          <tr>
+            <th class="left">Stat</th>
+            <th class="num">Value</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- RIGHT: Game log + links -->
+  <div class="card team-box">
+    <div class="card-title team-box-title">
+      Game Log <span class="card-subtitle">(Last 10 Games)</span>
+    </div>
+
+    <div id="gameLogStatus" class="status" hidden></div>
+
+    <div class="table-wrap">
+      <table class="data-table" id="gameLogTable">
+        <thead>
+          <tr>
+            <th class="num">Week</th>
+            <th>Opponent</th>
+            <th class="left">When</th>
+            <th class="num">Score</th>
+            <th class="left">Result</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <div class="table-spacer"></div>
+
+  </div>
+</section>
+
+  </main>
+
+  <script type="module" src="../js/player.js"></script>
+</body>
+</html>
