@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>WCPL — Teams</title>
+
+  <link rel="stylesheet" href="../css/main.css" />
+  <link rel="stylesheet" href="../css/tables.css" />
+</head>
+
+<body>
+  <header class="site-header">
+    <a class="brand" href="../index.html">WCPL Stats</a>
+
+    <nav class="nav">
+      <a class="active" href="teams.html">Teams</a>
+      <a href="players.html">Players</a>
+      <a href="games.html">Games</a>
+      <a href="standings.html">Standings</a>
+      <a href="charts.html">Charts</a>
+    </nav>
+
+    <div class="header-right">
+      <label class="season-picker">
+        <span>Season</span>
+        <select id="seasonSelect"></select>
+      </label>
+    </div>
+  </header>
+
+  <main class="page">
+    <h1>Teams</h1>
+
+    <section class="controls">
+      <label>
+        Conference
+        <select id="confFilter">
+          <option value="__ALL__">All</option>
+        </select>
+      </label>
+
+      <label class="search">
+        Search
+        <input id="teamSearch" type="search" placeholder="Team name / ID…" />
+      </label>
+    </section>
+
+    <div id="status" class="status">Loading…</div>
+
+    <div class="table-wrap">
+      <table id="teamsTable" class="data-table" hidden>
+        <thead>
+          <tr>
+            <th></th>
+            <th class="left">Team</th>
+            <th class="left">Conference</th>
+            <th class="num">GP</th>
+            <th class="num">W</th>
+            <th class="num">OTW</th>
+            <th class="num">L</th>
+            <th class="num">OTL</th>
+            <th class="num">PTS</th>
+            <th class="num">GF</th>
+            <th class="num">GA</th>
+            <th class="num">DIFF</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <p class="footnote">
+      Points system: Reg W=3, OTW=2, OTL=1, Reg L=0.
+    </p>
+  </main>
+
+  <script type="module" src="../js/teams.js"></script>
+</body>
+</html>

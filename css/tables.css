@@ -1,0 +1,55 @@
+.table-wrap {
+  margin-top: 12px;
+  overflow-x: auto;
+  border: 1px solid #232a35;
+  border-radius: 12px;
+  background: #0f1319;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.data-table th, .data-table td {
+  padding: 10px 10px;
+  border-bottom: 1px solid #1b2028;
+}
+
+.data-table th {
+  text-align: left;
+  font-size: 12px;
+  color: #b8c0cc;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.data-table td {
+  font-size: 14px;
+}
+
+.data-table td.num, .data-table th.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.logo-cell { width: 34px; }
+
+.logo {
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+  display: block;
+}
+
+.team-link {
+  color: #8bbcff;
+  text-decoration: none;
+  font-weight: 650;
+}
+
+.team-link:hover { text-decoration: underline; }
+
+.data-table tr:hover td {
+  background: rgba(255,255,255,0.03);
+}
