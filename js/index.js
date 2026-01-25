@@ -90,7 +90,7 @@ const regularPlayersPath = `${base}/${seasonId}/players.csv`;
 const playoffPlayersPath = `${base}/${seasonId}/players_playoffs.csv`;
 const gamesPath = `${base}/${seasonId}/games.csv`;
 const schedPath = `${base}/${seasonId}/schedule.csv`;
-const seasonsPath = `${base}/seasons.csv`.replace(`${base}/`, "data/"); // OR just keep seasons as "data/seasons.csv"
+const seasonsPath = `${base}/seasons.csv`;
 
 // Enable/disable the playoffs mode based on playoffs players file existing
 const hasPlayoffsPlayers = await urlExists(playoffPlayersPath);
