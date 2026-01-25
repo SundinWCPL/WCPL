@@ -1,94 +1,6 @@
 <!doctype html>
 <html lang="en">
 <head>
-<style>
-  /* Games page: make table geometry predictable */
-  #gamesTable { table-layout: fixed; }
-
-  #gamesTable td, #gamesTable th { vertical-align: middle; }
-
-  /* Override global logo-cell flex (tables.css) for this page only */
-  #gamesTable td.logo-cell{
-    display: table-cell !important;
-    padding: 0 !important;
-    text-align: center;
-  }
-
-  /* Center the VS column and the logo columns */
-  #gamesTable th:nth-child(2),
-  #gamesTable th:nth-child(3),
-  #gamesTable th:nth-child(4),
-  #gamesTable td:nth-child(2),
-  #gamesTable td:nth-child(3),
-  #gamesTable td:nth-child(4){
-    text-align: center;
-  }
-
-  /* Themed logo badge (color behind logo, not the whole cell) */
-  #gamesTable .logo-badge{
-    width: 110px;
-    height: 110px;
-    border-radius: 12px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    border: 1px solid rgba(255,255,255,0.10);
-    background: #0f1319;
-  }
-
-  /* Bigger logo for games page */
-  #gamesTable .logo-badge img{
-    width: 100px;
-    height: 100px;
-    object-fit: contain;
-    display: block;
-  }
-
-  /* VS cell */
-  #gamesTable .vs-cell{
-    width: 56px;
-    padding: 0 !important;
-    color: #b8c0cc;
-    font-size: 12px;
-    font-weight: 800;
-    letter-spacing: 0.6px;
-  }
-
-  /* Keep Result from dominating */
-  #gamesTable .result-cell{
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  
-  #gamesTable .result-pill{
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 6px 10px;
-  border-radius: 999px;
-  border: 1px solid rgba(255,255,255,0.14);
-  font-weight: 800;
-  font-size: 14px;
-  letter-spacing: 0.2px;
-  white-space: nowrap;
-  min-width: 110px;
-}
-
-#gamesTable th:first-child,
-#gamesTable td:first-child,
-#gamesTable th:last-child,
-#gamesTable td:last-child {
-  text-align: center !important;
-}
-
-#gamesTable .spacer-col {
-  width: 60px;       
-  padding: 0 !important;
-}
-
-
-</style>
 
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
@@ -96,6 +8,7 @@
 
   <link rel="stylesheet" href="../css/main.css" />
   <link rel="stylesheet" href="../css/tables.css" />
+  <link rel="stylesheet" href="../css/games.css" />
 </head>
 
 <body>
@@ -113,7 +26,6 @@
       <a href="teams.html">Teams</a>
       <a href="players.html">Players</a>
       <a class="active" href="games.html">Games</a>
-      <a href="standings.html">Standings</a>
     </nav>
 
     <div class="header-right">
@@ -126,20 +38,43 @@
 
   <main class="page">
     <h1>Games</h1>
+	
+	<div class="controls">
+  <label>
+    <span>Stage</span>
+    <select id="stageSelect">
+      <option value="reg">Regular Season</option>
+      <option value="po">Playoffs</option>
+    </select>
+  </label>
+  
+<div class="control">
+  <label for="gameStatus">Games</label>
+  <select id="gameStatus">
+    <option value="played" selected>Completed Games</option>
+    <option value="all">All Games</option>
+  </select>
+</div>
+
+</div>
 
     <div id="status" class="status">Loading…</div>
 
     <div class="table-wrap">
   <table id="gamesTable" class="data-table" style="table-layout: fixed;" hidden>
-    <colgroup>
-      <col style="width: 60px;">  <!-- Week -->
-      <col style="width: 92px;">   <!-- Home logo -->
-      <col style="width: 56px;">   <!-- VS -->
-      <col style="width: 92px;">   <!-- Away logo -->
-	  <col class="spacer-col">    <!-- Spacer -->
-      <col style="width: 140px;">  <!-- Result -->
-      <col style="width: 140px;">  <!-- Date -->
-    </colgroup>
+<colgroup>
+  <col style="width: 60px;">   <!-- Week/Stage -->
+  <col style="width: 130px;">  <!-- Home logo -->
+  <col style="width: 48px;">   <!-- VS -->
+  <col style="width: 130px;">  <!-- Away logo -->
+  <col style="width: 18px;">   <!-- Spacer -->
+  <col style="width: 140px;">  <!-- G1 -->
+  <col style="width: 140px;">  <!-- G2 -->
+  <col style="width: 140px;">  <!-- G3 -->
+  <col style="width: 140px;">  <!-- G4 -->
+  <col style="width: 140px;">  <!-- G5 -->
+  <col style="width: 96px;">   <!-- Date -->
+</colgroup>
 
 <thead>
   <tr>
@@ -151,6 +86,8 @@
     <th style="width: 150px; text-align:center;">G1</th>
     <th style="width: 150px; text-align:center;">G2</th>
     <th style="width: 150px; text-align:center;">G3</th>
+	<th style="width: 150px; text-align:center;">G4</th>
+	<th style="width: 150px; text-align:center;">G5</th>
     <th class="left" style="width: 140px;">Date</th>
   </tr>
 </thead>

@@ -34,7 +34,6 @@
       <a class="active" href="teams.html">Teams</a>
       <a href="players.html">Players</a>
       <a href="games.html">Games</a>
-      <a href="standings.html">Standings</a>
     </nav>
 
     <div class="header-right">
@@ -55,11 +54,16 @@
           <option value="__ALL__">All</option>
         </select>
       </label>
+	  
+	  <label>
+  Stats
+  <select id="stageSelect">
+    <option value="REG">Regular Season</option>
+    <option value="PO">Playoffs</option>
+  </select>
+</label>
 
-      <label class="search">
-        Search
-        <input id="teamSearch" type="search" placeholder="Team name / ID…" />
-      </label>
+
     </section>
 
     <div id="status" class="status">Loading…</div>
@@ -68,27 +72,35 @@
       <table id="teamsTable" class="data-table" hidden>
         <thead>
           <tr>
-            <th></th>
-            <th class="left">Team</th>
-            <th class="left">Conference</th>
-            <th class="num">GP</th>
-            <th class="num">W</th>
-            <th class="num">OTW</th>
-            <th class="num">L</th>
-            <th class="num">OTL</th>
-            <th class="num">PTS</th>
-            <th class="num">GF</th>
-            <th class="num">GA</th>
-            <th class="num">DIFF</th>
+				<th></th>
+				<th class="left">Team</th>
+				<th class="num" data-key="GP">GP</th>
+				<th class="num" data-key="W">W</th>
+				<th class="num" data-key="OTW">OTW</th>
+				<th class="num" data-key="OTL">OTL</th>
+				<th class="num" data-key="L">L</th>
+				<th class="num" data-key="PTS">PTS</th>
+				<th class="num" data-key="GF">GF</th>
+				<th class="num" data-key="GA">GA</th>
+				<th class="num" data-key="GDIFF">GDIFF</th>
+				<th class="num" data-key="SF">SF</th>
+				<th class="num" data-key="SA">SA</th>
+				<th class="num" data-key="SH">SH%</th>
+				<th class="num" data-key="SV">SV%</th>
+				<th class="num" data-key="PDO">PDO</th>
+				<th class="num" data-key="GFPG">GF/G</th>
+				<th class="num" data-key="GAPG">GA/G</th>
+				<th class="num" data-key="SFPG">SF/G</th>
+				<th class="num" data-key="SAPG">SA/G</th>
           </tr>
         </thead>
         <tbody></tbody>
       </table>
     </div>
 
-    <p class="footnote">
-      Points system: Reg W=3, OTW=2, OTL=1, Reg L=0.
-    </p>
+	<p id="pointsNote" class="footnote">
+	Points system: Reg W=3, OTW=2, OTL=1, Reg L=0.
+	</p>
   </main>
 
   <script type="module" src="../js/teams.js"></script>

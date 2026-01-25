@@ -21,10 +21,9 @@
 
 
     <nav class="nav">
-      <a href="teams.html">Teams</a>
+	  <a href="teams.html">Teams</a>
       <a href="players.html">Players</a>
       <a href="games.html">Games</a>
-      <a href="standings.html">Standings</a>
     </nav>
 
     <div class="header-right">
@@ -54,7 +53,18 @@
     <section id="teamBody" class="two-col">
       <!-- Roster -->
       <div class="card team-box">
-		<div class="card-title team-box-title">Roster</div>
+		<div class="card-title team-box-title stats-header">
+  <span>Roster</span>
+
+  <label class="control compact">
+    <span>Stats</span>
+    <select id="stageSelect">
+      <option value="REG">Regular Season</option>
+      <option value="PO">Playoffs</option>
+    </select>
+  </label>
+</div>
+
 
         <div class="table-wrap">
           <table class="data-table" id="skatersTable">
@@ -105,7 +115,7 @@
       <!-- Match history -->
       <div class="card team-box">
 		<div class="card-title team-box-title">
-			Match History <span class="card-subtitle">(Regular Season)</span>
+			Match History
 		</div>
 
         <div class="table-wrap">

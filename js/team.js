@@ -4,6 +4,7 @@ import { initSeasonPicker, getSeasonId, onSeasonChange } from "./season.js";
 
 const elSeason = document.getElementById("seasonSelect");
 const elStatus = document.getElementById("status");
+const elStage = document.getElementById("stageSelect");
 
 const elHero = document.getElementById("teamHero");
 const elLogo = document.getElementById("teamLogo");
@@ -23,7 +24,29 @@ boot();
 async function boot() {
   await initSeasonPicker(elSeason);
   onSeasonChange(() => refresh());
+  elStage.addEventListener("change", () => refresh());
   await refresh();
+}
+
+async function urlExists(url) {
+  try {
+    const r = await fetch(url, { method: "HEAD", cache: "no-store" });
+    if (r.ok) return true;
+    return false;
+  } catch {
+    try {
+      const r = await fetch(url, { method: "GET", cache: "no-store" });
+      return r.ok;
+    } catch {
+      return false;
+    }
+  }
+}
+
+function setPlayoffsOptionEnabled(enabled) {
+  const opt = [...elStage.options].find(o => o.value === "PO");
+  if (opt) opt.disabled = !enabled;
+  if (!enabled && elStage.value === "PO") elStage.value = "REG";
 }
 
 async function refresh() {
@@ -41,7 +64,19 @@ async function refresh() {
 
   try {
     const teamsPath = `../data/${seasonId}/teams.csv`;
-    const playersPath = `../data/${seasonId}/players.csv`;
+    const regularPlayersPath = `../data/${seasonId}/players.csv`;
+	const playoffPlayersPath = `../data/${seasonId}/players_playoffs.csv`;
+
+	// Detect if playoffs file exists for this season; disable option if not.
+	const hasPlayoffs = await urlExists(playoffPlayersPath);
+	setPlayoffsOptionEnabled(hasPlayoffs);
+
+	// Decide which players file to load
+	const stage = elStage.value; // "REG" | "PO"
+	const playersPath = (stage === "PO" && hasPlayoffs)
+	? playoffPlayersPath
+	: regularPlayersPath;
+
     const gamesPath = `../data/${seasonId}/games.csv`;
     const schedPath = `../data/${seasonId}/schedule.csv`;
 
@@ -79,21 +114,35 @@ document.body.classList.toggle("hide-adv", !advOn);
       schedByMatch.set(String(s.match_id).trim(), s);
     }
 
-    // Regular-season only games involving this team
-    const teamGames = games
-      .map(g => ({ g, s: schedByMatch.get(String(g.match_id ?? "").trim()) }))
-      .filter(({ g, s }) => {
-        if (!g.home_team_id || !g.away_team_id) return false;
-        const stage = (s?.stage ?? "").trim().toLowerCase();
-        if (stage !== "reg") return false;
-        const home = String(g.home_team_id).trim();
-        const away = String(g.away_team_id).trim();
-        return home === teamId || away === teamId;
-      });
 
-    // Compute record + points for header
-    const rec = computeRecord(teamId, teamGames.map(x => x.g));
-    renderHero(seasonId, team, rec);
+const teamGames = games
+  .map(g => ({ g, s: schedByMatch.get(String(g.match_id ?? "").trim()) }))
+  .filter(({ g }) => {
+    if (!g.home_team_id || !g.away_team_id) return false;
+    const home = String(g.home_team_id).trim();
+    const away = String(g.away_team_id).trim();
+    return home === teamId || away === teamId;
+  });
+
+const stageMode = (elStage?.value === "PO") ? "PO" : "REG";
+
+const teamGamesForRecord = teamGames
+  .filter(({ s }) => {
+    const st = String(s?.stage ?? "").trim().toLowerCase();
+    if (stageMode === "PO") return isPlayoffStage(st);
+    return st === "reg";
+  })
+  .map(x => x.g);
+
+// Compute record + header line
+const rec = computeRecord(teamId, teamGamesForRecord);
+
+// stageMode already computed above — don't redeclare it
+const poLabel = (stageMode === "PO")
+  ? computePlayoffResultLabel(teamId, teamGames)
+  : "";
+
+renderHero(seasonId, team, rec, stageMode, poLabel);
 
     // Render roster tables
     const roster = players.filter(p => String(p.team_id ?? "").trim() === teamId);
@@ -120,7 +169,7 @@ document.body.classList.toggle("hide-adv", !advOn);
 
 /* ------------------------- Hero ------------------------- */
 
-function renderHero(seasonId, team, rec) {
+function renderHero(seasonId, team, rec, stageMode, poLabel) {
   const teamName = (team.team_name ?? "").trim() || team.team_id;
   elName.textContent = teamName;
 
@@ -137,9 +186,11 @@ function renderHero(seasonId, team, rec) {
   document.documentElement.style.setProperty("--team-fg", fg);
 
   // Record text
-  const rankPart = ""; // (optional later: compute league rank)
-elMeta.textContent =
-  `${rankPart}${rec.GP} GP — ${rec.W}-${rec.OTW}-${rec.OTL}-${rec.L} — ${rec.PTS} pts — GF ${rec.GF}, GA ${rec.GA}, GDIFF ${rec.DIFF}`;
+if (stageMode === "PO") {
+  elMeta.textContent = `${rec.W} - ${rec.OTW} - ${rec.OTL} - ${rec.L} — ${poLabel}`;
+} else {
+  elMeta.textContent = `${rec.W} - ${rec.OTW} - ${rec.OTL} - ${rec.L} — ${rec.PTS} PTS`;
+}
 
   // Style hero
   elHero.classList.add("team-themed");
@@ -273,11 +324,14 @@ function renderMatches(teamId, teams, teamGames) {
     const oppGoals = isHome ? ag : hg;
 
     const result = resultLabel(teamGoals, oppGoals, ot);
-    const week = toIntMaybe(s?.week);
+    const stage = String(s?.stage ?? "").trim().toLowerCase();
+	const wk = toIntMaybe(s?.week);
+
+	const stageLabel = stageToLabel(stage, wk);
     const when = formatImportedOn(s?.imported_on);
 
     const tr = document.createElement("tr");
-    tr.appendChild(tdNumMaybe(week));
+    tr.appendChild(td(stageLabel));
     tr.appendChild(tdOpponent(oppId, oppName));
     tr.appendChild(td(when));
     tr.appendChild(tdNum(`${teamGoals}-${oppGoals}`));
@@ -494,4 +548,98 @@ function escapeHtml(s) {
     .replaceAll("'", "&#039;");
 }
 
+function stageToLabel(stage, weekNum) {
+  if (stage === "reg") return (weekNum != null ? String(weekNum) : "");
+  if (stage === "qf") return "QF";
+  if (stage === "sf") return "SF";
+  if (stage === "f")  return "F";
+  // fallback for unknown stages (keeps it robust)
+  return stage ? stage.toUpperCase() : "";
+}
 
+function isPlayoffStage(stage) {
+  const s = String(stage ?? "").trim().toLowerCase();
+  return s === "qf" || s === "sf" || s === "f";
+}
+
+function seriesIdFromMatchId(matchId) {
+  // "M35-G5" -> "M35"
+  return String(matchId ?? "").split("-")[0];
+}
+
+function gameNumFromMatchId(matchId) {
+  // "M35-G5" -> 5
+  const m = String(matchId ?? "").match(/-G(\d+)$/i);
+  return m ? parseInt(m[1], 10) : 0;
+}
+
+function winnerOfGame(teamId, g) {
+  const home = String(g.home_team_id ?? "").trim();
+  const away = String(g.away_team_id ?? "").trim();
+  const hg = toIntMaybe(g.home_goals);
+  const ag = toIntMaybe(g.away_goals);
+  if (hg == null || ag == null) return null;
+
+  const homeWon = hg > ag;
+  const awayWon = ag > hg;
+  if (!homeWon && !awayWon) return null; // shouldn't happen, but safe
+
+  return homeWon ? home : away;
+}
+
+function computePlayoffResultLabel(teamId, teamGames) {
+  // teamGames is your [{ g, s }] list (g from games.csv, s from schedule.csv)
+  // We determine outcome from the LAST game of each playoff series.
+
+  // Gather playoff games by series
+  const seriesMap = new Map(); // seriesId -> { stage, games: [{g,s}] }
+
+  for (const x of teamGames) {
+    const st = String(x.s?.stage ?? "").trim().toLowerCase();
+    if (!isPlayoffStage(st)) continue;
+
+    const sid = seriesIdFromMatchId(x.g?.match_id);
+    if (!sid) continue;
+
+    if (!seriesMap.has(sid)) seriesMap.set(sid, { stage: st, games: [] });
+    seriesMap.get(sid).games.push(x);
+  }
+
+  if (seriesMap.size === 0) return "No playoff games";
+
+  // Determine series result for THIS team from last game in that series
+  const seriesResults = []; // [{stage, sid, won}]
+  for (const [sid, obj] of seriesMap.entries()) {
+    const games = obj.games.slice().sort((a, b) =>
+      gameNumFromMatchId(a.g?.match_id) - gameNumFromMatchId(b.g?.match_id)
+    );
+    const last = games[games.length - 1];
+    const winTeam = winnerOfGame(teamId, last.g);
+    const won = (winTeam === teamId);
+    seriesResults.push({ stage: obj.stage, sid, won });
+  }
+
+  // Deepest stage played decides final label
+  const stageOrder = { qf: 1, sf: 2, f: 3 };
+  seriesResults.sort((a, b) => stageOrder[b.stage] - stageOrder[a.stage]);
+
+  const deepest = seriesResults[0];
+
+  // If they played in Finals and won that series: Champs
+  if (deepest.stage === "f" && deepest.won) {
+  const seasonId = getSeasonId();          // e.g. "S1"
+  const seasonNum = String(seasonId).replace(/^S/i, ""); // "1"
+  return `WCPL Season ${seasonNum} Champions`;
+}
+  if (deepest.stage === "f" && !deepest.won) return "Eliminated in Finals";
+
+  if (deepest.stage === "sf" && !deepest.won) return "Eliminated in Semi Finals";
+  if (deepest.stage === "qf" && !deepest.won) return "Eliminated in Quarter Finals";
+
+  // If they won deepest-but-not-final, they advanced (in completed seasons they should also appear later,
+  // but this makes the label correct even if data is partial).
+  if (deepest.stage === "sf" && deepest.won) return "Advanced to Finals";
+  if (deepest.stage === "qf" && deepest.won) return "Advanced to Semi Finals";
+
+  return "Playoffs";
+}

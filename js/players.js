@@ -3,21 +3,26 @@ import { initSeasonPicker, getSeasonId, onSeasonChange } from "./season.js";
 
 const elSeason = document.getElementById("seasonSelect");
 const elStatus = document.getElementById("status");
+const elStage = document.getElementById("stageSelect");
 
 const elPos = document.getElementById("posFilter");
 const elTeam = document.getElementById("teamFilter");
-const elSort = document.getElementById("sortSelect");
-const elSearch = document.getElementById("playerSearch");
+const elConf = document.getElementById("confFilter");
+const elMinGP = document.getElementById("minGP");
 
 const elTable = document.getElementById("playersTable");
 const elTbody = elTable.querySelector("tbody");
 const elThead = elTable.querySelector("thead");
-let advOn = false;
 
+let advOn = false;
 
 let seasons = [];
 let teams = [];
 let players = [];
+
+// Click-sort state (Teams-style)
+let sortKey = null;
+let sortDir = "desc"; // "desc" | "asc"
 
 boot();
 
@@ -32,12 +37,56 @@ async function boot() {
 
 function wireFilters() {
   elPos.addEventListener("change", () => {
-    buildSortOptions();
+    setDefaultSortForMode(elPos.value);
     render();
   });
+  elStage.addEventListener("change", () => refresh());
   elTeam.addEventListener("change", render);
-  elSort.addEventListener("change", render);
-  elSearch.addEventListener("input", render);
+  elConf.addEventListener("change", render);
+  elMinGP.addEventListener("input", render);
+
+  // Click-to-sort on headers
+  elThead.addEventListener("click", (e) => {
+    const th = e.target.closest("th");
+    if (!th) return;
+
+    const key = th.dataset.key;
+    if (!key) return; // non-sortable header
+
+    if (sortKey === key) {
+      sortDir = (sortDir === "desc") ? "asc" : "desc";
+    } else {
+      sortKey = key;
+      sortDir = "desc";
+    }
+
+    render();
+  });
+}
+
+async function urlExists(url) {
+  // Try HEAD first (fast); fall back to GET if HEAD is blocked by the host.
+  try {
+    const r = await fetch(url, { method: "HEAD", cache: "no-store" });
+    if (r.ok) return true;
+    // If HEAD returns not-ok, still treat as missing
+    return false;
+  } catch {
+    try {
+      const r = await fetch(url, { method: "GET", cache: "no-store" });
+      return r.ok;
+    } catch {
+      return false;
+    }
+  }
+}
+
+function setPlayoffsOptionEnabled(enabled) {
+  const opt = [...elStage.options].find(o => o.value === "PO");
+  if (opt) opt.disabled = !enabled;
+
+  // If playoffs is selected but not available, force back to regular
+  if (!enabled && elStage.value === "PO") elStage.value = "REG";
 }
 
 async function refresh() {
@@ -52,21 +101,39 @@ async function refresh() {
   try {
     const seasonsPath = `../data/seasons.csv`;
     const teamsPath = `../data/${seasonId}/teams.csv`;
-    const playersPath = `../data/${seasonId}/players.csv`;
 
-    [seasons, teams, players] = await Promise.all([
+    const regularPlayersPath = `../data/${seasonId}/players.csv`;
+    const playoffPlayersPath = `../data/${seasonId}/players_playoffs.csv`;
+
+    // Load seasons + teams first (needed for filters + theming)
+    [seasons, teams] = await Promise.all([
       loadCSV(seasonsPath),
       loadCSV(teamsPath),
-      loadCSV(playersPath),
     ]);
+
+    buildTeamOptions(teams);
+    buildConfOptions(teams);
 
     // adv_stats toggle like team.js
     const seasonRow = seasons.find(s => String(s.season_id ?? "").trim() === seasonId);
     advOn = (toIntMaybe(seasonRow?.adv_stats) ?? 0) === 1;
-	document.body.classList.toggle("hide-adv", !advOn);
+    document.body.classList.toggle("hide-adv", !advOn);
 
-    buildTeamOptions(teams);
-    buildSortOptions();
+    // Detect if playoffs CSV exists for this season; disable option if not.
+    const hasPlayoffs = await urlExists(playoffPlayersPath);
+    setPlayoffsOptionEnabled(hasPlayoffs);
+
+    // Decide which players file to load
+    const stage = elStage.value; // "REG" | "PO"
+    const playersPath = (stage === "PO" && hasPlayoffs)
+      ? playoffPlayersPath
+      : regularPlayersPath;
+
+    // Now load players
+    players = await loadCSV(playersPath);
+
+    // Default sort based on current mode
+    setDefaultSortForMode(elPos.value);
 
     setLoading(false);
     render();
@@ -74,6 +141,16 @@ async function refresh() {
     console.error(err);
     setLoading(true, `No data exists for Season ${seasonId}.`);
     elTable.hidden = true;
+  }
+}
+
+function setDefaultSortForMode(mode) {
+  if (mode === "GOALIE") {
+    sortKey = "SVP";   // SV% default
+    sortDir = "desc";
+  } else {
+    sortKey = "PTS";   // PTS default
+    sortDir = "desc";
   }
 }
 
@@ -86,7 +163,8 @@ function buildTeamOptions(teamRows) {
 
   const current = elTeam.value || "__ALL__";
   elTeam.innerHTML = `<option value="__ALL__">All</option>`;
-  [...opts].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }))
+  [...opts]
+    .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }))
     .forEach(id => {
       const opt = document.createElement("option");
       opt.value = id;
@@ -94,85 +172,83 @@ function buildTeamOptions(teamRows) {
       elTeam.appendChild(opt);
     });
 
-  // Preserve selection if possible
   if ([...elTeam.options].some(o => o.value === current)) elTeam.value = current;
 }
 
-function buildSortOptions() {
-  const mode = elPos.value;
-
-  const options = [
-    { value: "name_asc", label: "Name (A→Z)" },
-    { value: "team_asc", label: "Team (A→Z)" },
-  ];
-
-  if (mode === "GOALIE") {
-    options.push(
-      { value: "svp_desc", label: "SV%" },
-      { value: "gaa_asc", label: "GAA" },
-      { value: "w_desc", label: "Wins" },
-      { value: "gp_g_desc", label: "GP(G)" },
-    );
-  } else {
-    // ALL or SKATER
-    options.push(
-      { value: "pts_desc", label: "PTS" },
-      { value: "g_desc", label: "Goals" },
-      { value: "a_desc", label: "Assists" },
-      { value: "gp_s_desc", label: "GP(S)" },
-      { value: "shp_desc", label: "SH%" },
-    );
+function buildConfOptions(teamRows) {
+  const opts = new Set();
+  for (const t of teamRows) {
+    const c = String(t.conference ?? "").trim();
+    if (c) opts.add(c);
   }
 
-  const current = elSort.value || (mode === "GOALIE" ? "svp_desc" : "pts_desc");
-  elSort.innerHTML = "";
-  for (const o of options) {
-    const opt = document.createElement("option");
-    opt.value = o.value;
-    opt.textContent = o.label;
-    elSort.appendChild(opt);
-  }
+  const current = elConf.value || "__ALL__";
+  elConf.innerHTML = `<option value="__ALL__">All</option>`;
 
-  if ([...elSort.options].some(o => o.value === current)) elSort.value = current;
-  else elSort.value = options[0]?.value ?? "name_asc";
+  [...opts]
+    .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }))
+    .forEach(c => {
+      const opt = document.createElement("option");
+      opt.value = c;
+      opt.textContent = c;
+      elConf.appendChild(opt);
+    });
+
+  if ([...elConf.options].some(o => o.value === current)) elConf.value = current;
 }
 
 function render() {
   const seasonId = getSeasonId();
   const mode = elPos.value;          // "SKATER" or "GOALIE"
   const teamId = elTeam.value;       // "__ALL__" or team_id
-  const q = elSearch.value.trim().toLowerCase();
-  const sort = elSort.value;
+  const conf = elConf.value;         // "__ALL__" or conference name
+  const minGP = Math.max(1, parseInt(elMinGP.value || "1", 10) || 1);
 
   const teamById = new Map(teams.map(t => [String(t.team_id ?? "").trim(), t]));
 
   // --- filter ---
   let view = players.slice();
 
-  // position filter (no "All" logic here; if you still have it in HTML, it will behave like SKATER)
-  if (mode === "GOALIE") view = view.filter(p => (toIntMaybe(p.gp_g) ?? 0) > 0);
-  else view = view.filter(p => (toIntMaybe(p.gp_s) ?? 0) > 0);
+  if (conf !== "__ALL__") {
+    view = view.filter(p => {
+      const t = teamById.get(String(p.team_id ?? "").trim());
+      return String(t?.conference ?? "").trim() === conf;
+    });
+  }
+
+// Min GP depends on mode
+if (mode === "GOALIE") {
+  view = view.filter(p => (toIntMaybe(p.gp_g) ?? 0) >= minGP);
+} else {
+  // SKATER: min GP at skater + exclude pure goalies
+  view = view.filter(p =>
+    (toIntMaybe(p.gp_s) ?? 0) >= minGP &&
+    String(p.position ?? "").trim().toUpperCase() !== "G"
+  );
+}
 
   if (teamId !== "__ALL__") {
     view = view.filter(p => String(p.team_id ?? "").trim() === teamId);
-  }
-
-  if (q) {
-    view = view.filter(p =>
-      (p.name ?? "").toLowerCase().includes(q) ||
-      (p.team_id ?? "").toLowerCase().includes(q) ||
-      (p.position ?? "").toLowerCase().includes(q)
-    );
   }
 
   // --- map/decorate ---
   const rows = view.map(p => {
     const g = toIntMaybe(p.g) ?? 0;
 
+    // Shots + SH% (store as rate for sorting, percent for display)
     const shotsRaw = (p.shots ?? "").toString().trim();
     const shotsVal = shotsRaw === "" ? null : Number(shotsRaw);
     const shots = Number.isFinite(shotsVal) ? shotsVal : null;
-    const shp = (shots !== null && shots > 0) ? (g / shots) * 100 : null;
+    const shRate = (shots !== null && shots > 0) ? (g / shots) : null; // 0-1
+
+    // P/GP is already in CSV; if blank and GP>0, we can compute from pts/gp_s as fallback
+    const gp_s = toIntMaybe(p.gp_s) ?? 0;
+    const pts = toIntMaybe(p.pts) ?? 0;
+    const ppgCsv = toNumMaybe(p.p_per_gp);
+    const ppg = (ppgCsv != null && Number.isFinite(ppgCsv)) ? ppgCsv : (gp_s > 0 ? pts / gp_s : null);
+
+    // Goalie SV% is 0-1 in CSV
+    const svp = toNumMaybe(p.sv_pct);
 
     return {
       player_key: (p.player_key ?? "").trim(),
@@ -180,20 +256,20 @@ function render() {
       pos: (p.position ?? "").trim(),
       team_id: (p.team_id ?? "").trim(),
 
-      gp_s: toIntMaybe(p.gp_s) ?? 0,
+      gp_s,
       g,
       a: toIntMaybe(p.a) ?? 0,
-      pts: toIntMaybe(p.pts) ?? 0,
-      ppg: toNumMaybe(p.p_per_gp),
+      pts,
+      ppg,
       shots: (shots !== null ? Math.trunc(shots) : null),
-      shp,
+      shRate,
 
       hits: toIntMaybe(p.hits),
       ta: toIntMaybe(p.takeaways),
       to: toIntMaybe(p.turnovers),
 
       gp_g: toIntMaybe(p.gp_g) ?? 0,
-      svp: toNumMaybe(p.sv_pct), // 0-1
+      svp, // 0-1
       gaa: toNumMaybe(p.gaa),
       w: toIntMaybe(p.wins),
       so: toIntMaybe(p.so),
@@ -202,31 +278,18 @@ function render() {
     };
   });
 
-  // --- sort ---
-  rows.sort((a, b) => {
-    switch (sort) {
-      case "name_asc": return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
-      case "team_asc": return a.team_id.localeCompare(b.team_id, undefined, { sensitivity: "base" });
+  // --- sort (click headers) ---
+  // If sortKey is not valid for current mode, reset to defaults
+  if (!isSortKeyAllowedForMode(sortKey, mode)) {
+    setDefaultSortForMode(mode);
+  }
 
-      // skater sorts
-      case "pts_desc": return (b.pts - a.pts) || (b.g - a.g) || a.name.localeCompare(b.name);
-      case "g_desc": return (b.g - a.g) || (b.pts - a.pts) || a.name.localeCompare(b.name);
-      case "a_desc": return (b.a - a.a) || (b.pts - a.pts) || a.name.localeCompare(b.name);
-      case "gp_s_desc": return (b.gp_s - a.gp_s) || (b.pts - a.pts) || a.name.localeCompare(b.name);
-      case "shp_desc": return ((b.shp ?? -1) - (a.shp ?? -1)) || (b.pts - a.pts) || a.name.localeCompare(b.name);
-
-      // goalie sorts
-      case "svp_desc": return ((b.svp ?? -1) - (a.svp ?? -1)) || ((b.w ?? 0) - (a.w ?? 0)) || a.name.localeCompare(b.name);
-      case "gaa_asc": return ((a.gaa ?? 999) - (b.gaa ?? 999)) || ((b.w ?? 0) - (a.w ?? 0)) || a.name.localeCompare(b.name);
-      case "w_desc": return ((b.w ?? 0) - (a.w ?? 0)) || ((b.gp_g ?? 0) - (a.gp_g ?? 0)) || a.name.localeCompare(b.name);
-      case "gp_g_desc": return (b.gp_g - a.gp_g) || ((b.w ?? 0) - (a.w ?? 0)) || a.name.localeCompare(b.name);
-
-      default: return 0;
-    }
-  });
+  rows.sort((a, b) => compareByKey(a, b, sortKey, sortDir, mode));
 
   // --- header + body ---
   renderHeader(mode, advOn);
+  updateSortIndicators();
+
   elTbody.innerHTML = "";
 
   for (const r of rows) {
@@ -268,7 +331,7 @@ function render() {
 
     if (mode === "GOALIE") {
       tr.appendChild(tdNum(r.gp_g));
-      tr.appendChild(tdPctMaybe(r.svp !== null ? r.svp * 100 : null, 1));
+      tr.appendChild(tdPctMaybe(r.svp !== null ? r.svp * 100 : null, 1)); // display %
       tr.appendChild(tdNumMaybe(r.gaa, 2));
       tr.appendChild(tdNumMaybe(r.w));
       tr.appendChild(tdNumMaybe(r.so));
@@ -279,7 +342,7 @@ function render() {
       tr.appendChild(tdNum(r.pts));
       tr.appendChild(tdNumMaybe(r.ppg, 2));
       tr.appendChild(tdNumMaybe(r.shots));
-      tr.appendChild(tdPctMaybe(r.shp, 1));
+      tr.appendChild(tdPctMaybe(r.shRate !== null ? r.shRate * 100 : null, 1)); // display %
 
       if (advOn) {
         tr.appendChild(tdNumMaybe(r.hits, null, true));
@@ -295,6 +358,73 @@ function render() {
   elStatus.hidden = true;
 }
 
+function isSortKeyAllowedForMode(key, mode) {
+  if (!key) return false;
+  if (mode === "GOALIE") {
+    return ["GPG", "SVP", "GAA", "W", "SO"].includes(key);
+  }
+  return ["GPS", "G", "A", "PTS", "PPG", "S", "SH"].includes(key);
+}
+
+function compareByKey(a, b, key, dir, mode) {
+  const av = getSortValue(a, key, mode);
+  const bv = getSortValue(b, key, mode);
+
+  const aNull = (av == null || Number.isNaN(av));
+  const bNull = (bv == null || Number.isNaN(bv));
+
+  // null/blank always at bottom
+  if (aNull && bNull) return tieBreak(a, b);
+  if (aNull) return 1;
+  if (bNull) return -1;
+
+  const diff = bv - av; // default desc
+  const out = (dir === "desc") ? diff : -diff;
+
+  if (out !== 0) return out;
+  return tieBreak(a, b);
+}
+
+function tieBreak(a, b) {
+  // stable-ish tie break: PTS then name (for skaters), SVP then name (for goalies) is fine,
+  // but simplest is just name.
+  return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+}
+
+function getSortValue(r, key, mode) {
+  if (mode === "GOALIE") {
+    switch (key) {
+      case "GPG": return r.gp_g ?? 0;
+      case "SVP": return (r.svp == null ? null : r.svp); // 0-1
+      case "GAA": return (r.gaa == null ? null : r.gaa); // numeric
+      case "W":   return (r.w == null ? null : r.w);
+      case "SO":  return (r.so == null ? null : r.so);
+      default:    return null;
+    }
+  }
+
+  // SKATER
+  switch (key) {
+    case "GPS": return r.gp_s ?? 0;
+    case "G":   return r.g ?? 0;
+    case "A":   return r.a ?? 0;
+    case "PTS": return r.pts ?? 0;
+    case "PPG": return (r.ppg == null ? null : r.ppg);
+    case "S":   return (r.shots == null ? null : r.shots);
+    case "SH":  return (r.shRate == null ? null : r.shRate); // 0-1
+    default:    return null;
+  }
+}
+
+function updateSortIndicators() {
+  const ths = elThead.querySelectorAll("th[data-key]");
+  ths.forEach(th => {
+    th.classList.remove("sort-asc", "sort-desc");
+    if (th.dataset.key === sortKey) {
+      th.classList.add(sortDir === "asc" ? "sort-asc" : "sort-desc");
+    }
+  });
+}
 
 /* ------------------------- table helpers ------------------------- */
 
@@ -357,7 +487,7 @@ function setLoading(isLoading, msg = "") {
 function renderHeader(mode, advOn) {
   const cols = [];
 
-  // Common
+  // Common (not sortable)
   cols.push({ label: "", cls: "" });
   cols.push({ label: "Player", cls: "left" });
   cols.push({ label: "Pos", cls: "left" });
@@ -365,29 +495,28 @@ function renderHeader(mode, advOn) {
 
   if (mode === "GOALIE") {
     cols.push(
-      { label: "GP(G)", cls: "num" },
-      { label: "SV%", cls: "num" },
-      { label: "GAA", cls: "num" },
-      { label: "W", cls: "num" },
-      { label: "SO", cls: "num" },
+      { label: "GP", cls: "num", key: "GPG" },
+      { label: "SV%", cls: "num", key: "SVP" },
+      { label: "GAA", cls: "num", key: "GAA" },
+      { label: "W", cls: "num", key: "W" },
+      { label: "SO", cls: "num", key: "SO" },
     );
   } else {
-    // SKATER
     cols.push(
-      { label: "GP(S)", cls: "num" },
-      { label: "G", cls: "num" },
-      { label: "A", cls: "num" },
-      { label: "PTS", cls: "num" },
-      { label: "P/GP", cls: "num" },
-      { label: "S", cls: "num" },
-      { label: "SH%", cls: "num" },
+      { label: "GP", cls: "num", key: "GPS" },
+      { label: "G", cls: "num", key: "G" },
+      { label: "A", cls: "num", key: "A" },
+      { label: "PTS", cls: "num", key: "PTS" },
+      { label: "P/GP", cls: "num", key: "PPG" },
+      { label: "S", cls: "num", key: "S" },
+      { label: "SH%", cls: "num", key: "SH" },
     );
 
     if (advOn) {
       cols.push(
-        { label: "HIT", cls: "num adv" },
-        { label: "TA", cls: "num adv" },
-        { label: "TO", cls: "num adv" },
+        { label: "HIT", cls: "num adv" }, // not sortable
+        { label: "TA", cls: "num adv" },  // not sortable
+        { label: "TO", cls: "num adv" },  // not sortable
       );
     }
   }
@@ -397,10 +526,10 @@ function renderHeader(mode, advOn) {
     const th = document.createElement("th");
     th.textContent = c.label;
     if (c.cls) th.className = c.cls;
+    if (c.key) th.dataset.key = c.key; // sortable headers only
     tr.appendChild(th);
   }
 
   elThead.innerHTML = "";
   elThead.appendChild(tr);
 }
-

@@ -117,3 +117,29 @@
   justify-content: center;
 }
 
+/* Sortable header arrows */
+.data-table th[data-key]{
+  cursor: pointer;
+  user-select: none;
+}
+
+.data-table th[data-key]::after{
+  content: "";
+  margin-left: 6px;
+  font-size: 10px;
+  opacity: 0.6;
+}
+
+.data-table th.sort-asc::after{
+  content: "▲";
+}
+
+.data-table th.sort-desc::after{
+  content: "▼";
+}
+
+.data-table th.sort-asc,
+.data-table th.sort-desc{
+  color: #e7e7e7;
+}
+

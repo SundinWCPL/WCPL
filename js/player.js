@@ -3,6 +3,7 @@ import { initSeasonPicker, getSeasonId, onSeasonChange } from "./season.js";
 
 const elSeason = document.getElementById("seasonSelect");
 const elStatus = document.getElementById("status");
+const elStage = document.getElementById("stageSelect");
 
 const elHero = document.getElementById("playerHero");
 const elBody = document.getElementById("playerBody");
@@ -27,7 +28,30 @@ boot();
 async function boot() {
   await initSeasonPicker(elSeason);
   onSeasonChange(() => refresh());
+  elStage.addEventListener("change", () => refresh());
   await refresh();
+}
+
+async function urlExists(url) {
+  try {
+    const r = await fetch(url, { method: "HEAD", cache: "no-store" });
+    if (r.ok) return true;
+    return false;
+  } catch {
+    try {
+      const r = await fetch(url, { method: "GET", cache: "no-store" });
+      return r.ok;
+    } catch {
+      return false;
+    }
+  }
+}
+
+function setPlayoffsOptionEnabled(enabled) {
+  const opt = [...elStage.options].find(o => o.value === "PO");
+  if (opt) opt.disabled = !enabled;
+
+  if (!enabled && elStage.value === "PO") elStage.value = "REG";
 }
 
 async function refresh() {
@@ -46,7 +70,19 @@ async function refresh() {
   try {
     const seasonsPath = `../data/seasons.csv`;
     const teamsPath = `../data/${seasonId}/teams.csv`;
-    const playersPath = `../data/${seasonId}/players.csv`;
+    const regularPlayersPath = `../data/${seasonId}/players.csv`;
+	const playoffPlayersPath = `../data/${seasonId}/players_playoffs.csv`;
+
+	// Detect if playoffs file exists for this season; disable option if not.
+	const hasPlayoffs = await urlExists(playoffPlayersPath);
+	setPlayoffsOptionEnabled(hasPlayoffs);
+
+	// Decide which players file to load
+	const stage = elStage.value; // "REG" | "PO"
+	const playersPath = (stage === "PO" && hasPlayoffs)
+  ? playoffPlayersPath
+  : regularPlayersPath;
+
 
     const [seasons, teams, players] = await Promise.all([
       loadCSV(seasonsPath),

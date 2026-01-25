@@ -1,0 +1,433 @@
+/* =========================
+   INDEX ONLY (Home page)
+   ========================= */
+/* Index-only: let the Home page use the full viewport width */
+.page.home-page{
+  max-width: none;          /* removes 1150px cap from main.css */
+  width: 100%;
+  margin: 0 auto;
+  padding-left: 18px;       /* keep consistent with header padding */
+  padding-right: 18px;
+}
+
+/* Layout spacing on home */
+.home-section { margin: 18px 0; }
+.home-h1 { margin: 0; }
+
+/* Schedule header row */
+.home-section-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  margin-bottom:10px;
+}
+
+.schedule-nav{
+  display:flex;
+  gap:8px;
+}
+
+.icon-btn{
+  border:1px solid #232a35;
+  border-radius:10px;
+  background: rgba(255,255,255,0.03);
+  color: inherit;
+  padding: 6px 10px;
+  font-weight: 900;
+  cursor:pointer;
+  line-height:1;
+}
+
+.icon-btn:hover{
+  background: rgba(255,255,255,0.06);
+}
+
+/* Horizontal strip */
+.schedule-strip-wrap{
+  overflow:hidden;            /* keep the page clean */
+}
+
+.schedule-strip{
+  display:flex;
+  gap:10px;
+  overflow-x:auto;
+  padding: 2px 2px 8px;
+  scroll-snap-type:x mandatory;
+  -webkit-overflow-scrolling: touch;
+}
+
+.schedule-strip::-webkit-scrollbar{ height:10px; }
+.schedule-strip::-webkit-scrollbar-thumb{
+  background: rgba(255,255,255,0.12);
+  border-radius: 999px;
+}
+.schedule-strip::-webkit-scrollbar-track{
+  background: rgba(255,255,255,0.03);
+  border-radius: 999px;
+}
+
+/* Schedule cards */
+.sched-card{
+  flex: 0 0 200px;           /* card width */
+  border: 1px solid #232a35;
+  border-radius: 12px;
+  background: rgba(255,255,255,0.02);
+  padding: 8px;
+  scroll-snap-align:center;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+}
+
+.sched-top{
+  font-weight: 600;
+  font-size: 11px;
+  opacity: 0.9;
+  margin-bottom: 4px;
+}
+
+.sched-row{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  border-radius: 10px;
+  padding: 5px;
+  background: rgba(0,0,0,0.25);
+  border: 1px solid rgba(255,255,255,0.06);
+}
+
+.sched-row + .sched-row{
+  margin-top: 1px;
+}
+
+.sched-left{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  min-width: 0;
+}
+
+.sched-logo{
+  width: 30px;
+  height: 30px;
+  border-radius: 10px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  overflow:hidden;
+  border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.04);
+  flex: 0 0 auto;
+}
+
+.sched-logo img{
+  width: 26px;
+  height: 26px;
+  object-fit: contain;
+}
+
+.sched-team{
+  font-size: 12px;
+  font-weight: 850;
+  letter-spacing: 0.2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sched-score{
+  font-size: 14px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  min-width: 18px;
+  text-align: right;
+}
+
+.sched-foot{
+  margin-top: 1px;
+  font-weight: 600;
+  font-size: 11px;
+  opacity: 1;
+}
+
+/* Two cards under schedule */
+.home-two{
+  display:grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
+  margin-top: 14px;
+}
+
+@media (min-width: 980px){
+  .home-two{ grid-template-columns: 1fr 1fr; align-items:start; }
+}
+
+/* Mini standings grid on index */
+.standings-mini-grid.two-col{
+  display:grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
+}
+
+@media (min-width: 980px){
+  .standings-mini-grid.two-col{ grid-template-columns: 1fr 1fr; }
+}
+
+.standings-mini-title{
+  font-weight: 900;
+  text-align:center;
+  margin: 2px 0 8px;
+}
+
+/* Make home mini tables feel tighter */
+.home-page .data-table th,
+.home-page .data-table td{
+  padding-top: 9px;
+  padding-bottom: 9px;
+}
+
+.home-page .logo-cell .logo{
+  width: 40px;
+  height: 40px;
+}
+
+.home-page #homeSkaters .logo-cell .logo,
+.home-page #homeGoalies .logo-cell .logo{
+  width: 30px;   /* ~40% smaller than 40px */
+  height:30px;
+}
+
+.home-page #homeSkaters td.logo-cell,
+.home-page #homeGoalies td.logo-cell{
+  padding: 0px;              /* reduces space around the logo */
+}
+
+.table-spacer{ height: 8px; }
+
+/* Index: make League Leaders a bit denser so it fits */
+.home-page #homeLeadersCard .data-table th,
+.home-page #homeLeadersCard .data-table td{
+  padding-top: 4px;
+  padding-bottom: 3px;
+}
+
+.home-page #homeLeadersCard .leaders-subtitle{
+  margin: 8px 0 8px;  /* less vertical */
+}
+
+/* ---------------------------
+   Home page shell (index only)
+   --------------------------- */
+.home-page .home-shell{
+  /* centers EVERYTHING (schedule + cards) as one unit */
+  width: min(1700px, calc(100% - 48px));
+  margin: 0 auto;
+
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* make sure the sections actually use the shell width */
+.home-page .home-section,
+.home-page .home-two{
+  width: 100%;
+}
+
+/* Default: two cards side-by-side on desktop */
+.home-page .home-two{
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); /* Standings wider than Leaders */
+  gap: 14px;
+  align-items: start;
+}
+
+/* Stack ONLY on truly small screens */
+@media (max-width: 720px){
+  .home-page .home-two{
+    grid-template-columns: 1fr;
+  }
+}
+
+/* When 2 conferences exist, FORCE side-by-side even more strongly */
+.home-page.home-wide .home-two{
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+}
+
+/* ---------------------------
+   Playoffs (Home page)
+   --------------------------- */
+
+.playoffs-grid{
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
+  margin-top: 6px;
+}
+
+@media (min-width: 980px){
+  .playoffs-grid{
+    grid-template-columns: 1fr 1fr 1fr; /* QF / SF / F */
+    align-items: start;
+  }
+}
+
+.playoffs-col-title{
+  font-weight: 900;
+  text-align: center;
+  margin: 2px 0 8px;
+}
+
+.series-card{
+  border: 1px solid #232a35;
+  border-radius: 12px;
+  background: rgba(255,255,255,0.02);
+  padding: 10px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+}
+
+.series-top{
+  display:flex;
+  justify-content:space-between;
+  gap:10px;
+  font-weight: 700;
+  font-size: 11px;
+  opacity: 0.9;
+  margin-bottom: 6px;
+}
+
+.series-teams{
+  display:grid;
+  gap:4px;
+}
+
+.series-team{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  border-radius: 10px;
+  padding: 6px 8px;
+  background: rgba(0,0,0,0.25);
+  border: 1px solid rgba(255,255,255,0.06);
+  font-weight: 850;
+}
+
+.series-team .name{
+  min-width: 0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  font-size: 12px;
+}
+
+.series-team .wins{
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  opacity: 0.95;
+}
+
+.series-foot{
+  margin-top: 6px;
+  font-weight: 650;
+  font-size: 11px;
+  opacity: 0.95;
+}
+
+/* Bracket pills: winner/loser emphasis */
+.series-team.is-winner{
+  border: 2px solid #d4af37; /* gold */
+  opacity: 1;
+}
+
+.series-team.is-loser{
+  opacity: 0.55;
+}
+
+.series-team{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+}
+
+.series-left{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  min-width:0;
+}
+
+.pill-logo{
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+  flex: 0 0 auto;
+  filter: drop-shadow(0 2px 6px rgba(0,0,0,0.45));
+}
+
+.series-team .name{
+  min-width: 0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+/* --- Playoff bracket pills --- */
+.series-row{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--team-bg, #222);
+  color: var(--team-fg, #fff);
+  border: 1px solid rgba(0,0,0,0.35);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08);
+}
+
+/* left side */
+.series-left{
+  display:flex;
+  align-items:center;
+  gap: 10px;
+  min-width:0;
+}
+
+.series-left .name{
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* logo */
+.pill-logo{
+  width: 52px;
+  height: 52px;
+  object-fit: contain;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.45));
+}
+
+/* wins */
+.series-row .wins{
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+/* winner highlight */
+.series-row.is-winner{
+  border: 2px solid #d4af37; /* gold */
+  box-shadow:
+    0 0 0 1px rgba(0,0,0,0.35),
+    0 0 10px rgba(212,175,55,0.35);
+}
+
+/* loser fade */
+.series-row.is-loser{
+  opacity: 0.55;
+  filter: saturate(0.7);
+}
+
+}
+
+

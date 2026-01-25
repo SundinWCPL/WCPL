@@ -6,6 +6,8 @@ const elSeason = document.getElementById("seasonSelect");
 const elStatus = document.getElementById("status");
 const elTable  = document.getElementById("gamesTable");
 const elTbody  = elTable.querySelector("tbody");
+const elStage = document.getElementById("stageSelect");
+const elGameStatus = document.getElementById("gameStatus");
 
 let teams = [];
 let scheduleRows = [];
@@ -18,6 +20,8 @@ boot();
 async function boot() {
   await initSeasonPicker(elSeason);
   onSeasonChange(() => refresh());
+  elStage.addEventListener("change", renderSeries);
+  elGameStatus.addEventListener("change", renderSeries);
   await refresh();
 }
 
@@ -51,7 +55,17 @@ async function refresh() {
 
 function renderSeries() {
   const seasonId = getSeasonId();
+  const stageMode = (elStage?.value ?? "reg");
+  const gameStatus = elGameStatus?.value ?? "played";
+  const includeUnplayed = (gameStatus === "all");
+  document.body.classList.toggle("games-wide", stageMode === "po");
+  document.body.classList.toggle("games-regular", stageMode === "reg");
+  elTable.classList.toggle("show-5", stageMode === "po");
+  const th0 = elTable.querySelector("thead th:first-child");
+  if (th0) th0.textContent = (stageMode === "po") ? "Stage" : "Week";
+
   if (!seasonId) return;
+
 
   // team_id -> colors (names not needed here)
   const tmap = new Map();
@@ -63,8 +77,8 @@ function renderSeries() {
       bg_color: (t.bg_color ?? "").trim(),
       text_color: (t.text_color ?? "").trim(),
     });
-	teamMap = tmap;
   }
+    teamMap = tmap;
 
   // match_id -> game row
   const gameById = new Map();
@@ -82,7 +96,13 @@ function renderSeries() {
     const stage = (s.stage ?? "").trim().toLowerCase();
     const status = (s.status ?? "").trim().toLowerCase();
 
-    if (stage !== "reg") continue;
+    if (stageMode === "reg") {
+	if (stage !== "reg") continue;
+	} else {
+	// Playoffs mode: include qf/sf/f
+	if (stage === "reg") continue;
+	}
+
     if (status === "cancelled") continue;
 
     const g = gameById.get(matchId);
@@ -91,6 +111,7 @@ function renderSeries() {
     const awayId = ((s.away_team_id ?? "") || (g?.away_team_id ?? "")).trim();
 
     const played = status === "played" || hasValidScore(g);
+	if (!includeUnplayed && !played) continue;
     const hg = played ? toIntMaybe(g?.home_goals) : null;
     const ag = played ? toIntMaybe(g?.away_goals) : null;
     const ot = played ? (toIntMaybe(g?.ot) ?? 0) : 0;
@@ -105,6 +126,7 @@ function renderSeries() {
       home_goals: hg,
       away_goals: ag,
       ot,
+	  stage,
     });
   }
 
@@ -117,14 +139,17 @@ function renderSeries() {
   // Group series by (week, home, away)
   const seriesMap = new Map();
   for (const g of schedGames) {
-    const key = `${g.week}||${g.home_team_id}||${g.away_team_id}`;
+    const st = (g.stage ?? "reg");
+	const wk = (g.week ?? 0);
+	const key = `${st}||${wk}||${g.home_team_id}||${g.away_team_id}`;
     if (!seriesMap.has(key)) {
-      seriesMap.set(key, {
-        week: g.week,
-        home_team_id: g.home_team_id,
-        away_team_id: g.away_team_id,
-        games: [],
-      });
+seriesMap.set(key, {
+  stage: g.stage,
+  week: g.week,
+  home_team_id: g.home_team_id,
+  away_team_id: g.away_team_id,
+  games: [],
+});
     }
     seriesMap.get(key).games.push(g);
   }
@@ -138,26 +163,50 @@ function renderSeries() {
     // show latest imported_on as the series date
     const latest = s.games
       .map(x => x.imported_on)
-      .sort((a, b) => dateKey(b) - dateKey(a))[0] || "";
+      .sort((a, b) => {
+  const da = dateKey(a), db = dateKey(b);
+  if (!Number.isFinite(da) && !Number.isFinite(db)) return 0;
+  if (!Number.isFinite(da)) return 1;
+  if (!Number.isFinite(db)) return -1;
+  return db - da;
+})[0] || "";
 
-    rows.push({
-      week: s.week,
-      home_team_id: s.home_team_id,
-      away_team_id: s.away_team_id,
-      g1: s.games[0] ?? null,
-      g2: s.games[1] ?? null,
-      g3: s.games[2] ?? null,
-      date: latest,
-    });
+// Count series wins (played games only)
+let homeWins = 0, awayWins = 0;
+
+for (const g of s.games) {
+  if (!g.played || g.home_goals == null || g.away_goals == null) continue;
+  if (g.home_goals > g.away_goals) homeWins++;
+  else if (g.away_goals > g.home_goals) awayWins++;
+}
+
+const winner_id =
+  homeWins > awayWins ? s.home_team_id :
+  awayWins > homeWins ? s.away_team_id :
+  null;
+
+rows.push({
+  stage: s.stage,
+  week: s.week,
+  home_team_id: s.home_team_id,
+  away_team_id: s.away_team_id,
+  winner_id,
+  g1: s.games[0] ?? null,
+  g2: s.games[1] ?? null,
+  g3: s.games[2] ?? null,
+  g4: s.games[3] ?? null,
+  g5: s.games[4] ?? null,
+  date: latest,
+});
   }
 
-  // Sort oldest -> newest
-  rows.sort((a, b) => {
-    const ta = dateKey(a.date);
-    const tb = dateKey(b.date);
-    if (ta !== tb) return ta - tb;
-    return (a.week - b.week) || `${a.home_team_id}||${a.away_team_id}`.localeCompare(`${b.home_team_id}||${b.away_team_id}`);
-  });
+// Sort newest -> oldest
+rows.sort((a, b) => {
+  const ta = dateKey(a.date);
+  const tb = dateKey(b.date);
+  if (ta !== tb) return tb - ta;
+  return (b.week - a.week) || `${a.home_team_id}||${a.away_team_id}`.localeCompare(`${b.home_team_id}||${b.away_team_id}`);
+});
 
   // Render
   elTbody.innerHTML = "";
@@ -167,21 +216,30 @@ function renderSeries() {
 
     // Week number only
     const tdWeek = document.createElement("td");
-    tdWeek.textContent = r.week ? String(r.week) : "";
+    tdWeek.textContent = stageLabel(r.stage, r.week);
 	tdWeek.style.textAlign = "center";
     tr.appendChild(tdWeek);
-
-    const home = tmap.get(r.home_team_id) || fallbackTeam(r.home_team_id);
-    tr.appendChild(tdTeamLogoOnly(home, seasonId));
-
-    const tdVs = document.createElement("td");
-    tdVs.className = "vs-cell";
-    tdVs.textContent = "VS";
-    tr.appendChild(tdVs);
-
-    const away = tmap.get(r.away_team_id) || fallbackTeam(r.away_team_id);
-    tr.appendChild(tdTeamLogoOnly(away, seasonId));
 	
+	const homeOutcome = r.winner_id
+  ? (r.winner_id === r.home_team_id ? "win" : "lose")
+  : null;
+
+	const awayOutcome = r.winner_id
+  ? (r.winner_id === r.away_team_id ? "win" : "lose")
+  : null;
+
+
+	const home = tmap.get(r.home_team_id) || fallbackTeam(r.home_team_id);
+	tr.appendChild(tdTeamLogoOnly(home, seasonId, homeOutcome));
+
+	const tdVs = document.createElement("td");
+	tdVs.className = "vs-cell";
+	tdVs.textContent = "VS";
+	tr.appendChild(tdVs);
+
+	const away = tmap.get(r.away_team_id) || fallbackTeam(r.away_team_id);
+	tr.appendChild(tdTeamLogoOnly(away, seasonId, awayOutcome));
+
 	// Spacer column
 	const tdSpacer = document.createElement("td");
 	tdSpacer.className = "spacer-col";
@@ -190,6 +248,8 @@ function renderSeries() {
     tr.appendChild(tdGameResult(r.g1));
     tr.appendChild(tdGameResult(r.g2));
     tr.appendChild(tdGameResult(r.g3));
+	tr.appendChild(tdGameResult(r.g4));
+	tr.appendChild(tdGameResult(r.g5));
 
     const tdDate = document.createElement("td");
     tdDate.textContent = formatDate(r.date);
@@ -249,9 +309,9 @@ return td;
 
 }
 
-function tdTeamLogoOnly(team, seasonId) {
+function tdTeamLogoOnly(team, seasonId, outcome /* "win" | "lose" | null */) {
   const td = document.createElement("td");
-  td.className = "logo-cell logo-cell--flex";
+  td.className = "logo-cell";
 
   const a = document.createElement("a");
   a.href = `team.html?season=${encodeURIComponent(seasonId)}&team_id=${encodeURIComponent(team.team_id)}`;
@@ -261,6 +321,8 @@ function tdTeamLogoOnly(team, seasonId) {
   // If not, it still works (just a normal div).
   const badge = document.createElement("div");
   badge.className = "logo-badge";
+  if (outcome === "win") badge.classList.add("series-winner");
+else if (outcome === "lose") badge.classList.add("series-loser");
   if (team.bg_color) badge.style.backgroundColor = team.bg_color;
 
   const img = document.createElement("img");
@@ -311,4 +373,12 @@ function setLoading(isLoading, msg = "") {
 
 function getTeam(teamId) {
   return teamMap.get(teamId) || null;
+}
+
+function stageLabel(stage, week) {
+  if (stage === "reg") return week ? String(week) : "";
+  if (stage === "qf") return "QF";
+  if (stage === "sf") return "SF";
+  if (stage === "f")  return "F";
+  return stage ? stage.toUpperCase() : "";
 }

@@ -21,10 +21,9 @@
 
 
     <nav class="nav">
-      <a href="teams.html">Teams</a>
+	  <a href="teams.html">Teams</a>
       <a class="active" href="players.html">Players</a>
       <a href="games.html">Games</a>
-      <a href="standings.html">Standings</a>
     </nav>
 
     <div class="header-right">
@@ -46,6 +45,15 @@
           <option value="GOALIE">Goalies</option>
         </select>
       </label>
+	  
+	  <label>
+  Stats
+  <select id="stageSelect">
+    <option value="REG">Regular Season</option>
+    <option value="PO">Playoffs</option>
+  </select>
+</label>
+
 
       <label>
         Team
@@ -53,16 +61,19 @@
           <option value="__ALL__">All</option>
         </select>
       </label>
+	  
+	<label class="control">
+	<span class="control-label">Conference</span>
+	<select id="confFilter">
+		<option value="__ALL__">All</option>
+	</select>
+	</label>
 
-      <label>
-        Sort
-        <select id="sortSelect"></select>
-      </label>
+	<label class="control">
+	<span class="control-label">Min GP</span>
+	<input id="minGP" type="number" min="0" step="1" value="1" />
+	</label>
 
-      <label class="search">
-        Search
-        <input id="playerSearch" type="search" placeholder="Player name / team…" />
-      </label>
     </section>
 
     <div id="status" class="status">Loading…</div>
@@ -77,7 +88,7 @@
             <th class="left">Team</th>
 
             <!-- Skater -->
-            <th class="num">GP(S)</th>
+            <th class="num">GP</th>
             <th class="num">G</th>
             <th class="num">A</th>
             <th class="num">PTS</th>

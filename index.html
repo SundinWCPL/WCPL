@@ -2,10 +2,143 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta http-equiv="refresh" content="0; url=pages/teams.html" />
-  <title>WCPL Stats</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>WCPL — Home</title>
+
+  <link rel="stylesheet" href="css/main.css" />
+  <link rel="stylesheet" href="css/tables.css" />
+  <link rel="stylesheet" href="css/index.css" />
 </head>
+
 <body>
-  <p>Redirecting to Teams…</p>
+  <header class="site-header">
+    <a class="brand" href="index.html">
+      <img
+        src="assets/wcpl_logo.png"
+        alt="WCPL"
+        class="league-logo"
+      />
+    </a>
+
+    <nav class="nav">
+      <a href="pages/teams.html">Teams</a>
+      <a href="pages/players.html">Players</a>
+      <a href="pages/games.html">Games</a>
+    </nav>
+
+    <div class="header-right">
+      <label class="season-picker">
+        <span>Season</span>
+        <select id="seasonSelect"></select>
+      </label>
+    </div>
+  </header>
+
+  <main class="page home-page" id="pageBody" hidden>
+  <div class="home-shell">
+    <!-- Schedule strip -->
+    <section class="home-section">
+      <div class="home-section-head">
+        <h1 class="home-h1">Schedule</h1>
+
+        <div class="schedule-nav">
+          <button id="schedPrev" class="icon-btn" type="button" aria-label="Scroll left">‹</button>
+          <button id="schedNext" class="icon-btn" type="button" aria-label="Scroll right">›</button>
+        </div>
+      </div>
+
+      <div class="schedule-strip-wrap">
+        <div id="scheduleStrip" class="schedule-strip" aria-label="Schedule"></div>
+      </div>
+    </section>
+
+    <!-- Two tables -->
+    <section class="home-two">
+      <!-- Standings -->
+<div class="card">
+  <div class="card-title stats-header">
+    <span>
+      Standings
+      <span id="homeStageSubtitle" class="card-subtitle">(Regular Season)</span>
+    </span>
+
+    <label class="control compact">
+      <select id="stageSelect">
+        <option value="REG">Regular Season</option>
+        <option value="PO">Playoffs</option>
+      </select>
+    </label>
+  </div>
+
+  <!-- Regular-season standings (existing) -->
+  <div id="homeStandingsWrap" class="standings-mini-grid" hidden></div>
+
+  <!-- Playoffs bracket (new) -->
+  <div id="homePlayoffsWrap" class="playoffs-grid" hidden></div>
+</div>
+
+      <!-- Leaders -->
+      <div class="card" id="homeLeadersCard">
+        <div class="card-title">
+  League Leaders
+  <span id="leadersStageSubtitle" class="card-subtitle">(Regular Season)</span>
+</div>
+
+
+        <div class="leaders-block">
+          <div class="leaders-subtitle">Top Skaters</div>
+          <div class="table-wrap">
+            <table id="homeSkaters" class="data-table" hidden>
+              <thead>
+                <tr>
+                  <th></th>
+                  <th class="left">Player</th>
+                  <th class="num">GP</th>
+                  <th class="num">PTS</th>
+                  <th class="num">G</th>
+                  <th class="num">A</th>
+				  <th class="num">Sh%</th>
+                  <th class="left">Team</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="table-spacer"></div>
+
+        <div class="leaders-block">
+          <div class="leaders-subtitle">Top Goalies</div>
+          <div class="table-wrap">
+            <table id="homeGoalies" class="data-table" hidden>
+              <thead>
+                <tr>
+                  <th></th>
+                  <th class="left">Player</th>
+                  <th class="num">GP</th>
+                  <th class="num">SV%</th>
+				  <th class="num">GAA</th>
+                  <th class="num">SA</th>
+                  <th class="num">SO</th>
+                  <th class="left">Team</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </section>
+	</div>
+  </main>
+
+  <!-- Friendly empty-state -->
+  <div class="page" id="statusWrap">
+    <div id="status" class="status">Loading…</div>
+  </div>
+
+  <script type="module" src="js/index.js"></script>
 </body>
 </html>

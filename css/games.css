@@ -1,0 +1,155 @@
+/* =========================================================
+   Games Page – Page-specific styles
+   ========================================================= */
+   
+.games-regular .page{
+  max-width: 950px;
+}
+
+.games-wide .page{
+  max-width: 1300px;
+}
+
+/* --- Table base tweaks (scoped) --- */
+#gamesTable {
+  table-layout: fixed;
+}
+
+/* --- VS column centering (was drifting) --- */
+#gamesTable .vs-cell {
+  text-align: center !important;
+  vertical-align: middle;
+  font-weight: 700;
+  opacity: 0.85;
+}
+
+/* --- Home / Away logo cells --- */
+#gamesTable .logo-cell{
+  text-align: center;
+  vertical-align: middle;
+}
+
+/* --- Game result pill layout --- */
+#gamesTable td.result-cell {
+  padding: 6px 8px;
+  text-align: center;
+}
+
+#gamesTable td.result-cell:empty::after {
+  content: "";
+  display: inline-block;
+  min-width: 110px;
+}
+
+/* Ensure pills are visually centered and consistent */
+#gamesTable .result-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 110px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* --- Hide G4 / G5 unless playoffs are selected --- */
+/* Column index reference:
+   1 Week/Stage
+   2 Home
+   3 VS
+   4 Away
+   5 Spacer
+   6 G1
+   7 G2
+   8 G3
+   9 G4
+   10 G5
+   11 Date
+*/
+#gamesTable:not(.show-5) th:nth-child(9),
+#gamesTable:not(.show-5) td:nth-child(9),
+#gamesTable:not(.show-5) th:nth-child(10),
+#gamesTable:not(.show-5) td:nth-child(10) {
+  display: none;
+}
+
+/* --- Stage / Week column --- */
+#gamesTable th:first-child,
+#gamesTable td:first-child {
+  text-align: center;
+  font-weight: 600;
+  opacity: 0.9;
+}
+
+/* --- Date column --- */
+#gamesTable td:last-child {
+  font-size: 12px;
+  opacity: 0.85;
+  white-space: nowrap;
+}
+
+/* --- Improve horizontal scroll feel --- */
+.games-table-wrapper {
+  overflow-x: auto;
+  padding-bottom: 6px;
+}
+
+/* --- Small screens: slightly tighter pills --- */
+@media (max-width: 1200px) {
+  #gamesTable .result-pill {
+    min-width: 96px;
+    font-size: 12px;
+  }
+}
+
+/* --- Games page logo sizing (CRITICAL) --- */
+#gamesTable .logo-badge{
+  width: 100px;
+  height: 100px;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+#gamesTable .logo-badge img{
+  max-width: 92%;
+  max-height: 92%;
+  object-fit: contain;
+  display: block;
+}
+
+/* Series outcome styling on Games page */
+#gamesTable .logo-badge.series-winner{
+  box-shadow: 0 0 0 3px #d4af37;
+  transform: translateZ(0);
+}
+
+#gamesTable .logo-badge.series-loser{
+  opacity: 0.45;
+  filter: grayscale(0.25) saturate(0.7);
+}
+
+#gamesTable .vs-cell{
+  text-align: center !important;
+  vertical-align: middle;
+  padding-left: 0;
+  padding-right: 0;
+}
+
+/* Center all Games table headers */
+#gamesTable thead th{
+  text-align: center;
+  vertical-align: middle;
+}
+
+/* Controls row alignment (Stage + checkbox) */
+.controls{
+  display: flex;
+  align-items: flex-end;
+  gap: 16px;
+}
+

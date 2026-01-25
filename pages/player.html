@@ -24,7 +24,6 @@
       <a href="teams.html">Teams</a>
       <a href="players.html">Players</a>
       <a href="games.html">Games</a>
-      <a href="standings.html">Standings</a>
     </nav>
 
     <div class="header-right">
@@ -54,9 +53,21 @@
 
     <!-- Body (hide on missing player / missing season) -->
     <section id="playerBody" class="two-col">
-  <!-- LEFT: Stats card -->
-  <div class="card team-box">
-    <div class="card-title team-box-title">Skater Stats</div>
+<!-- LEFT: Stats card -->
+<div class="card team-box">
+
+<div class="card-title team-box-title stats-header">
+  <span>Skater Stats</span>
+
+  <label class="control compact">
+    <span>Stats</span>
+    <select id="stageSelect">
+      <option value="REG">Regular Season</option>
+      <option value="PO">Playoffs</option>
+    </select>
+  </label>
+</div>
+
     <div class="table-wrap">
       <table class="data-table" id="skaterStatsTable">
         <thead>
