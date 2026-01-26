@@ -1,7 +1,10 @@
 // js/season.js
 import { loadCSV, truthy01 } from "./data.js";
 
-const SEASONS_PATH = "../data/seasons.csv";
+const SEASONS_PATH = new URL(
+  (window.location.pathname.includes("/pages/") ? "../data/" : "data/") + "seasons.csv",
+  window.location.href
+).toString();
 
 let seasons = [];
 let currentSeasonId = null;
