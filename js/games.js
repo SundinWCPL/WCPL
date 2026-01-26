@@ -6,6 +6,7 @@ const elSeason = document.getElementById("seasonSelect");
 const elStatus = document.getElementById("status");
 const elTable  = document.getElementById("gamesTable");
 const elTbody  = elTable.querySelector("tbody");
+const elThead  = elTable.querySelector("thead");
 const elStage = document.getElementById("stageSelect");
 const elGameStatus = document.getElementById("gameStatus");
 
@@ -14,6 +15,9 @@ let scheduleRows = [];
 let gamesRows = [];
 let teamMap = new Map();
 
+let sortKey = "DATE";     // "date" | "week"
+let sortDir = "desc";     // "asc" | "desc"
+let lastGameStatus = null;
 
 boot();
 
@@ -22,6 +26,25 @@ async function boot() {
   onSeasonChange(() => refresh());
   elStage.addEventListener("change", renderSeries);
   elGameStatus.addEventListener("change", renderSeries);
+// Click-to-sort on headers (Players-style)
+elThead.addEventListener("click", (e) => {
+  const th = e.target.closest("th");
+  if (!th) return;
+
+  const key = th.dataset.key;
+  if (!key) return; // not sortable
+
+  if (sortKey === key) {
+    sortDir = (sortDir === "desc") ? "asc" : "desc";
+  } else {
+    sortKey = key;
+    // Default direction when clicking a new column:
+    // WEEK feels natural ascending; DATE feels natural descending
+    sortDir = (key === "WEEK") ? "asc" : "desc";
+  }
+
+  renderSeries();
+});
   await refresh();
 }
 
@@ -58,11 +81,20 @@ function renderSeries() {
   const stageMode = (elStage?.value ?? "reg");
   const gameStatus = elGameStatus?.value ?? "played";
   const includeUnplayed = (gameStatus === "all");
+  if (gameStatus !== lastGameStatus) {
+  // Default behavior:
+  // - Completed: latest first (desc)
+  // - All: schedule view (asc)
+  sortKey = "DATE";
+  sortDir = (gameStatus === "all") ? "asc" : "desc";
+  lastGameStatus = gameStatus;
+}
   document.body.classList.toggle("games-wide", stageMode === "po");
   document.body.classList.toggle("games-regular", stageMode === "reg");
   elTable.classList.toggle("show-5", stageMode === "po");
-  const th0 = elTable.querySelector("thead th:first-child");
-  if (th0) th0.textContent = (stageMode === "po") ? "Stage" : "Week";
+	const thWeek = document.getElementById("thWeek");
+	if (thWeek) thWeek.textContent = (stageMode === "po") ? "Stage" : "Week";
+	updateSortIndicators();
 
   if (!seasonId) return;
 
@@ -200,12 +232,24 @@ rows.push({
 });
   }
 
-// Sort newest -> oldest
+const dir = (sortDir === "asc") ? 1 : -1;
+
 rows.sort((a, b) => {
-  const ta = dateKey(a.date);
-  const tb = dateKey(b.date);
-  if (ta !== tb) return tb - ta;
-  return (b.week - a.week) || `${a.home_team_id}||${a.away_team_id}`.localeCompare(`${b.home_team_id}||${b.away_team_id}`);
+  let cmp = 0;
+
+  if (sortKey === "WEEK") {
+    // Stage tie-breaker (so playoffs stages group nicely), then teams
+    cmp = (a.week - b.week);
+    if (cmp === 0) cmp = String(a.stage ?? "").localeCompare(String(b.stage ?? ""));
+  } else { // "DATE"
+    const ta = dateKey(a.date);
+    const tb = dateKey(b.date);
+    cmp = (ta - tb);
+    if (cmp === 0) cmp = (a.week - b.week);
+  }
+
+  if (cmp !== 0) return cmp * dir;
+  return `${a.home_team_id}||${a.away_team_id}`.localeCompare(`${b.home_team_id}||${b.away_team_id}`);
 });
 
   // Render
@@ -245,11 +289,11 @@ rows.sort((a, b) => {
 	tdSpacer.className = "spacer-col";
 	tr.appendChild(tdSpacer);
 
-    tr.appendChild(tdGameResult(r.g1));
-    tr.appendChild(tdGameResult(r.g2));
-    tr.appendChild(tdGameResult(r.g3));
-	tr.appendChild(tdGameResult(r.g4));
-	tr.appendChild(tdGameResult(r.g5));
+	tr.appendChild(tdGameResult(r.g1, seasonId));
+	tr.appendChild(tdGameResult(r.g2, seasonId));
+	tr.appendChild(tdGameResult(r.g3, seasonId));
+	tr.appendChild(tdGameResult(r.g4, seasonId));
+	tr.appendChild(tdGameResult(r.g5, seasonId));
 
     const tdDate = document.createElement("td");
     tdDate.textContent = formatDate(r.date);
@@ -262,7 +306,17 @@ rows.sort((a, b) => {
   elTable.hidden = false;
 }
 
-function tdGameResult(game) {
+function updateSortIndicators() {
+  const ths = elThead.querySelectorAll("th[data-key]");
+  ths.forEach(th => {
+    th.classList.remove("sort-asc", "sort-desc");
+    if (th.dataset.key === sortKey) {
+      th.classList.add(sortDir === "asc" ? "sort-asc" : "sort-desc");
+    }
+  });
+}
+
+function tdGameResult(game, seasonId) {
   const td = document.createElement("td");
   td.className = "result-cell";
   td.style.textAlign = "center";
@@ -272,8 +326,22 @@ function tdGameResult(game) {
     return td;
   }
 
+  const matchId = (game.match_id ?? "").trim();
+  const href = `boxscore.html?season=${encodeURIComponent(seasonId)}&match_id=${encodeURIComponent(matchId)}`;
+
+  // Always link (played or scheduled) so scheduled games become "Preview"
+  const a = document.createElement("a");
+  a.href = href;
+  a.style.textDecoration = "none";
+  a.style.display = "inline-block";
+
+  // Scheduled / missing score
   if (!game.played || game.home_goals === null || game.away_goals === null) {
-    td.textContent = "TBD";
+    const pill = document.createElement("span");
+    pill.className = "result-pill";
+    pill.textContent = "TBD";
+    a.appendChild(pill);
+    td.appendChild(a);
     return td;
   }
 
@@ -286,28 +354,35 @@ function tdGameResult(game) {
   } else if (ag > hg) {
     winScore = ag; loseScore = hg; winTeamId = game.away_team_id;
   } else {
-    td.textContent = `${hg} - ${ag}`;
+    // Tie shouldn't happen, but handle anyway
+    const pill = document.createElement("span");
+    pill.className = "result-pill";
+    pill.textContent = `${hg} - ${ag}`;
+    a.appendChild(pill);
+    td.appendChild(a);
     return td;
   }
 
   const ot = toIntMaybe(game.ot) ?? 0;
   let otTag = "";
-if (ot === 1) otTag = " (OT)";
-else if (ot > 1) otTag = ` (OT${ot})`;
+  if (ot === 1) otTag = " (OT)";
+  else if (ot > 1) otTag = ` (OT${ot})`;
 
   const pill = document.createElement("span");
-pill.className = "result-pill";
+  pill.className = "result-pill";
 
-// theme by winning team colors
-const winTeam = getTeam(winTeamId);
-if (winTeam?.bg_color) pill.style.backgroundColor = winTeam.bg_color;
-if (winTeam?.text_color) pill.style.color = winTeam.text_color;
+  // theme by winning team colors
+  const winTeam = getTeam(winTeamId);
+  if (winTeam?.bg_color) pill.style.backgroundColor = winTeam.bg_color;
+  if (winTeam?.text_color) pill.style.color = winTeam.text_color;
 
-pill.textContent = `${winScore} - ${loseScore} ${winTeamId}${otTag}`;
-td.appendChild(pill);
-return td;
+  pill.textContent = `${winScore} - ${loseScore} ${winTeamId}${otTag}`;
 
+  a.appendChild(pill);
+  td.appendChild(a);
+  return td;
 }
+
 
 function tdTeamLogoOnly(team, seasonId, outcome /* "win" | "lose" | null */) {
   const td = document.createElement("td");

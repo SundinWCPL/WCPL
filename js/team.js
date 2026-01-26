@@ -199,68 +199,86 @@ if (stageMode === "PO") {
 /* ------------------------- Roster ------------------------- */
 
 function renderRoster(roster, advOn) {
-  // Skaters: gp_s > 0
+
+  /* ---------- SKATERS ---------- */
   const skaters = roster
-    .filter(p => (toIntMaybe(p.gp_s) ?? 0) > 0)
+    .filter(p => String(p.position ?? "").trim().toUpperCase() !== "G")
     .map(p => {
-      const g = toIntMaybe(p.g) ?? 0;
+      const gp = toIntMaybe(p.gp_s) ?? 0;
+      const g  = toIntMaybe(p.g);
+      const a  = toIntMaybe(p.a);
+      const pts = toIntMaybe(p.pts);
 
       const shotsRaw = (p.shots ?? "").toString().trim();
       const shotsVal = shotsRaw === "" ? null : Number(shotsRaw);
       const shots = Number.isFinite(shotsVal) ? shotsVal : null;
 
-      const shp = (shots !== null && shots > 0) ? (g / shots) * 100 : null;
+      const shp = (gp > 0 && shots && shots > 0) ? (g / shots) * 100 : null;
 
       return {
         name: p.name ?? "",
         pos: p.position ?? "",
-        gp: toIntMaybe(p.gp_s) ?? 0,
-        g,
-        a: toIntMaybe(p.a) ?? 0,
-        pts: toIntMaybe(p.pts) ?? 0,
-        ppg: toNumMaybe(p.p_per_gp),
-        shots: (shots !== null ? Math.trunc(shots) : null),
+        gp: gp || null,
+        g: gp > 0 ? g : null,
+        a: gp > 0 ? a : null,
+        pts: gp > 0 ? pts : null,
+        ppg: gp > 0 ? toNumMaybe(p.p_per_gp) : null,
+        shots: gp > 0 ? shots : null,
         shp,
-        hits: toIntMaybe(p.hits),
-        ta: toIntMaybe(p.takeaways),
-        to: toIntMaybe(p.turnovers),
-		player_key: p.player_key ?? "",
+        hits: gp > 0 ? toIntMaybe(p.hits) : null,
+        ta: gp > 0 ? toIntMaybe(p.takeaways) : null,
+        to: gp > 0 ? toIntMaybe(p.turnovers) : null,
+        player_key: p.player_key ?? "",
       };
     })
-    .sort((a, b) => (b.pts - a.pts) || (b.g - a.g) || a.name.localeCompare(b.name));
+    .sort((a, b) =>
+      (b.pts ?? -1) - (a.pts ?? -1) ||
+      (b.g ?? -1) - (a.g ?? -1) ||
+      a.name.localeCompare(b.name)
+    );
 
-  // Goalies: gp_g > 0 (S/G can appear here too)
+  /* ---------- GOALIES ---------- */
   const goalies = roster
-    .filter(p => (toIntMaybe(p.gp_g) ?? 0) > 0)
-    .map(p => ({
-      name: p.name ?? "",
-      pos: p.position ?? "",
-      gp: toIntMaybe(p.gp_g) ?? 0,
-      sa: toIntMaybe(p.sa),
-      ga: toIntMaybe(p.ga),
-      svp: toNumMaybe(p.sv_pct),
-      gaa: toNumMaybe(p.gaa),
-      w: toIntMaybe(p.wins),
-      so: toIntMaybe(p.so),
-	  player_key: p.player_key ?? "",
-    }))
-    .sort((a, b) => (b.w ?? 0) - (a.w ?? 0) || (b.gp - a.gp) || a.name.localeCompare(b.name));
+    .filter(p => String(p.position ?? "").trim().toUpperCase() !== "S")
+    .map(p => {
+  const gp = toIntMaybe(p.gp_g) ?? 0;
+  const sa = gp > 0 ? toIntMaybe(p.sa) : null;
+  const ga = gp > 0 ? toIntMaybe(p.ga) : null;
+  const sv = (sa != null && ga != null) ? (sa - ga) : null;
 
-  // Render skaters (ONCE)
+  return {
+    name: p.name ?? "",
+    pos: p.position ?? "",
+    gp: gp || null,
+    sa,
+    ga,
+    sv,
+    svp: gp > 0 ? toNumMaybe(p.sv_pct) : null,
+    gaa: gp > 0 ? toNumMaybe(p.gaa) : null,
+    w: gp > 0 ? toIntMaybe(p.wins) : null,
+    so: gp > 0 ? toIntMaybe(p.so) : null,
+    player_key: p.player_key ?? "",
+  };
+})
+    .sort((a, b) =>
+      (b.w ?? -1) - (a.w ?? -1) ||
+      (b.gp ?? -1) - (a.gp ?? -1) ||
+      a.name.localeCompare(b.name)
+    );
+
+  /* ---------- RENDER SKATERS ---------- */
   skatersBody.innerHTML = "";
   for (const p of skaters) {
     const tr = document.createElement("tr");
     tr.appendChild(tdLinkPlayer(p.name, p.player_key));
-    tr.appendChild(td(p.pos));
-    tr.appendChild(tdNum(p.gp));
-    tr.appendChild(tdNum(p.g));
-    tr.appendChild(tdNum(p.a));
-    tr.appendChild(tdNum(p.pts));
+    tr.appendChild(tdNumMaybe(p.gp));
+    tr.appendChild(tdNumMaybe(p.g));
+    tr.appendChild(tdNumMaybe(p.a));
+    tr.appendChild(tdNumMaybe(p.pts));
     tr.appendChild(tdNumMaybe(p.ppg, 2));
     tr.appendChild(tdNumMaybe(p.shots));
-    tr.appendChild(tdPctMaybe(p.shp, 1)); // 16.4%
+    tr.appendChild(tdPctMaybe(p.shp, 1));
 
-    // Advanced columns (hidden when adv_stats=0)
     tr.appendChild(tdNumMaybe(p.hits, null, true));
     tr.appendChild(tdNumMaybe(p.ta, null, true));
     tr.appendChild(tdNumMaybe(p.to, null, true));
@@ -268,15 +286,15 @@ function renderRoster(roster, advOn) {
     skatersBody.appendChild(tr);
   }
 
-  // Render goalies
+  /* ---------- RENDER GOALIES ---------- */
   goaliesBody.innerHTML = "";
   for (const g of goalies) {
     const tr = document.createElement("tr");
     tr.appendChild(tdLinkPlayer(g.name, g.player_key));
-    tr.appendChild(td(g.pos));
-    tr.appendChild(tdNum(g.gp));
+    tr.appendChild(tdNumMaybe(g.gp));
     tr.appendChild(tdNumMaybe(g.sa));
     tr.appendChild(tdNumMaybe(g.ga));
+	tr.appendChild(tdNumMaybe(g.sv));
     tr.appendChild(tdPctMaybe(g.svp !== null ? g.svp * 100 : null, 1));
     tr.appendChild(tdNumMaybe(g.gaa, 2));
     tr.appendChild(tdNumMaybe(g.w));
@@ -291,17 +309,30 @@ function renderMatches(teamId, teams, teamGames) {
   const teamById = new Map(teams.map(t => [String(t.team_id).trim(), t]));
 
   // Sort by imported_on desc if present, else week desc, else match_id desc
-  const rows = teamGames
-    .map(({ g, s }) => ({ g, s }))
-    .sort((a, b) => {
-      const aImp = (a.s?.imported_on ?? "").trim();
-      const bImp = (b.s?.imported_on ?? "").trim();
-      if (aImp && bImp) return bImp.localeCompare(aImp);
-      const aw = toIntMaybe(a.s?.week) ?? -1;
-      const bw = toIntMaybe(b.s?.week) ?? -1;
-      if (aw !== bw) return bw - aw;
-      return String(b.g.match_id ?? "").localeCompare(String(a.g.match_id ?? ""));
-    });
+// Sort: stage/week (so Week # and QF/SF/F group correctly),
+// then series (M#), then game number DESC (G3 -> G2 -> G1),
+// then imported_on DESC as a final tie-breaker.
+const rows = teamGames
+  .map(({ g, s }) => ({ g, s }))
+  .sort((a, b) => {
+    // 1) imported_on DESC (primary)
+    const aImp = String(a.s?.imported_on ?? "").trim();
+    const bImp = String(b.s?.imported_on ?? "").trim();
+    if (aImp !== bImp) return bImp.localeCompare(aImp);
+
+    // 2) series/matchup grouping (M#) ASC so games stay together
+    const aSeries = seriesIdFromMatchId(a.g?.match_id);
+    const bSeries = seriesIdFromMatchId(b.g?.match_id);
+    if (aSeries !== bSeries) return String(aSeries).localeCompare(String(bSeries));
+
+    // 3) game number DESC (G3 -> G2 -> G1) (this is the fix)
+    const aGame = gameNumFromMatchId(a.g?.match_id);
+    const bGame = gameNumFromMatchId(b.g?.match_id);
+    if (aGame !== bGame) return bGame - aGame;
+
+    // 4) final tie-breaker: match_id DESC (stable-ish)
+    return String(b.g?.match_id ?? "").localeCompare(String(a.g?.match_id ?? ""));
+  });
 
   matchesBody.innerHTML = "";
 
@@ -331,6 +362,29 @@ function renderMatches(teamId, teams, teamGames) {
     const when = formatImportedOn(s?.imported_on);
 
     const tr = document.createElement("tr");
+	const seasonId = getSeasonId();
+const matchId = String(g.match_id ?? "").trim();
+const href = `boxscore.html?season=${encodeURIComponent(seasonId)}&match_id=${encodeURIComponent(matchId)}`;
+
+// click anywhere on the row
+tr.style.cursor = "pointer";
+tr.tabIndex = 0;
+tr.setAttribute("role", "link");
+tr.setAttribute("aria-label", `Open boxscore for ${matchId}`);
+
+tr.addEventListener("click", (e) => {
+  // If you ever add real links inside the row later, don't hijack them
+  if (e.target.closest("a")) return;
+  window.location.href = href;
+});
+
+tr.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" || e.key === " ") {
+    e.preventDefault();
+    window.location.href = href;
+  }
+});
+
     tr.appendChild(td(stageLabel));
     tr.appendChild(tdOpponent(oppId, oppName));
     tr.appendChild(td(when));

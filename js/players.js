@@ -68,9 +68,7 @@ async function urlExists(url) {
   // Try HEAD first (fast); fall back to GET if HEAD is blocked by the host.
   try {
     const r = await fetch(url, { method: "HEAD", cache: "no-store" });
-    if (r.ok) return true;
-    // If HEAD returns not-ok, still treat as missing
-    return false;
+    return r.ok;
   } catch {
     try {
       const r = await fetch(url, { method: "GET", cache: "no-store" });
@@ -139,7 +137,7 @@ async function refresh() {
     render();
   } catch (err) {
     console.error(err);
-    setLoading(true, `No data exists for Season ${seasonId}.`);
+    setLoading(true, `No data exists for Season ${getSeasonId()}.`);
     elTable.hidden = true;
   }
 }
@@ -202,7 +200,7 @@ function render() {
   const mode = elPos.value;          // "SKATER" or "GOALIE"
   const teamId = elTeam.value;       // "__ALL__" or team_id
   const conf = elConf.value;         // "__ALL__" or conference name
-  const minGP = Math.max(1, parseInt(elMinGP.value || "1", 10) || 1);
+  const minGP = Math.max(0, parseInt(elMinGP.value || "0", 10) || 0);
 
   const teamById = new Map(teams.map(t => [String(t.team_id ?? "").trim(), t]));
 
@@ -216,16 +214,20 @@ function render() {
     });
   }
 
-// Min GP depends on mode
-if (mode === "GOALIE") {
-  view = view.filter(p => (toIntMaybe(p.gp_g) ?? 0) >= minGP);
-} else {
-  // SKATER: min GP at skater + exclude pure goalies
-  view = view.filter(p =>
-    (toIntMaybe(p.gp_s) ?? 0) >= minGP &&
-    String(p.position ?? "").trim().toUpperCase() !== "G"
-  );
-}
+  // Min GP depends on mode
+  if (mode === "GOALIE") {
+    // GOALIE: min GP at goalie + exclude pure skaters
+    view = view.filter(p =>
+      (toIntMaybe(p.gp_g) ?? 0) >= minGP &&
+      String(p.position ?? "").trim().toUpperCase() !== "S"
+    );
+  } else {
+    // SKATER: min GP at skater + exclude pure goalies
+    view = view.filter(p =>
+      (toIntMaybe(p.gp_s) ?? 0) >= minGP &&
+      String(p.position ?? "").trim().toUpperCase() !== "G"
+    );
+  }
 
   if (teamId !== "__ALL__") {
     view = view.filter(p => String(p.team_id ?? "").trim() === teamId);
@@ -247,8 +249,18 @@ if (mode === "GOALIE") {
     const ppgCsv = toNumMaybe(p.p_per_gp);
     const ppg = (ppgCsv != null && Number.isFinite(ppgCsv)) ? ppgCsv : (gp_s > 0 ? pts / gp_s : null);
 
-    // Goalie SV% is 0-1 in CSV
-    const svp = toNumMaybe(p.sv_pct);
+    // Star Points (CSV preferred; fallback to sp/gp_s if needed)
+    const sp = toNumMaybe(p.sp);
+    const spgCsv = toNumMaybe(p.sp_per_gp);
+    const spg = (spgCsv != null && Number.isFinite(spgCsv)) ? spgCsv : (gp_s > 0 && sp != null ? sp / gp_s : null);
+
+    // Goalie stats
+    const gp_g = toIntMaybe(p.gp_g) ?? 0;
+    const svp = toNumMaybe(p.sv_pct); // 0-1 in CSV
+    const gaa = toNumMaybe(p.gaa);
+    const sa = toIntMaybe(p.sa);
+    const ga = toIntMaybe(p.ga);
+    const sv = (sa != null && ga != null) ? (sa - ga) : null;
 
     return {
       player_key: (p.player_key ?? "").trim(),
@@ -256,6 +268,7 @@ if (mode === "GOALIE") {
       pos: (p.position ?? "").trim(),
       team_id: (p.team_id ?? "").trim(),
 
+      // skater
       gp_s,
       g,
       a: toIntMaybe(p.a) ?? 0,
@@ -264,26 +277,33 @@ if (mode === "GOALIE") {
       shots: (shots !== null ? Math.trunc(shots) : null),
       shRate,
 
+      // adv (skater)
       hits: toIntMaybe(p.hits),
       ta: toIntMaybe(p.takeaways),
       to: toIntMaybe(p.turnovers),
 
-      gp_g: toIntMaybe(p.gp_g) ?? 0,
+      // goalie
+      gp_g,
+      sa,
+      ga,
+      sv,
       svp, // 0-1
-      gaa: toNumMaybe(p.gaa),
+      gaa,
       w: toIntMaybe(p.wins),
       so: toIntMaybe(p.so),
+
+      // star points (shown in both modes)
+      sp,
+      spg,
 
       team: teamById.get((p.team_id ?? "").trim()),
     };
   });
 
   // --- sort (click headers) ---
-  // If sortKey is not valid for current mode, reset to defaults
   if (!isSortKeyAllowedForMode(sortKey, mode)) {
     setDefaultSortForMode(mode);
   }
-
   rows.sort((a, b) => compareByKey(a, b, sortKey, sortDir, mode));
 
   // --- header + body ---
@@ -303,9 +323,15 @@ if (mode === "GOALIE") {
     const img = document.createElement("img");
     img.className = "logo";
     img.loading = "lazy";
-    img.alt = `${r.team_id} logo`;
-    img.src = `../logos/${seasonId}/${r.team_id}.png`;
-    img.onerror = () => (img.style.visibility = "hidden");
+
+    if (!r.team_id) {
+      img.style.visibility = "hidden";
+    } else {
+      img.alt = `${r.team_id} logo`;
+      img.src = `../logos/${seasonId}/${r.team_id}.png`;
+      img.onerror = () => (img.style.visibility = "hidden");
+    }
+
     tdLogo.appendChild(img);
 
     // Player link
@@ -318,11 +344,15 @@ if (mode === "GOALIE") {
 
     // Team link
     const tdTeam = document.createElement("td");
-    const aTeam = document.createElement("a");
-    aTeam.className = "team-link";
-    aTeam.href = `team.html?season=${encodeURIComponent(seasonId)}&team_id=${encodeURIComponent(r.team_id)}`;
-    aTeam.textContent = r.team_id;
-    tdTeam.appendChild(aTeam);
+    if (!r.team_id) {
+      tdTeam.textContent = "Free Agent";
+    } else {
+      const aTeam = document.createElement("a");
+      aTeam.className = "team-link";
+      aTeam.href = `team.html?season=${encodeURIComponent(seasonId)}&team_id=${encodeURIComponent(r.team_id)}`;
+      aTeam.textContent = r.team_id;
+      tdTeam.appendChild(aTeam);
+    }
 
     tr.appendChild(tdLogo);
     tr.appendChild(tdPlayer);
@@ -331,18 +361,25 @@ if (mode === "GOALIE") {
 
     if (mode === "GOALIE") {
       tr.appendChild(tdNum(r.gp_g));
-      tr.appendChild(tdPctMaybe(r.svp !== null ? r.svp * 100 : null, 1)); // display %
+      tr.appendChild(tdNumMaybe(r.sa));
+      tr.appendChild(tdNumMaybe(r.ga));
+      tr.appendChild(tdNumMaybe(r.sv));
+      tr.appendChild(tdPctMaybe(r.svp !== null ? r.svp * 100 : null, 1));
       tr.appendChild(tdNumMaybe(r.gaa, 2));
       tr.appendChild(tdNumMaybe(r.w));
       tr.appendChild(tdNumMaybe(r.so));
+      tr.appendChild(tdNumMaybe(r.sp, 1));
+      tr.appendChild(tdNumMaybe(r.spg, 2));
     } else {
       tr.appendChild(tdNum(r.gp_s));
       tr.appendChild(tdNum(r.g));
       tr.appendChild(tdNum(r.a));
       tr.appendChild(tdNum(r.pts));
+      tr.appendChild(tdNumMaybe(r.sp, 1));
+      tr.appendChild(tdNumMaybe(r.spg, 2));
       tr.appendChild(tdNumMaybe(r.ppg, 2));
       tr.appendChild(tdNumMaybe(r.shots));
-      tr.appendChild(tdPctMaybe(r.shRate !== null ? r.shRate * 100 : null, 1)); // display %
+      tr.appendChild(tdPctMaybe(r.shRate !== null ? r.shRate * 100 : null, 1));
 
       if (advOn) {
         tr.appendChild(tdNumMaybe(r.hits, null, true));
@@ -360,10 +397,11 @@ if (mode === "GOALIE") {
 
 function isSortKeyAllowedForMode(key, mode) {
   if (!key) return false;
+
   if (mode === "GOALIE") {
-    return ["GPG", "SVP", "GAA", "W", "SO"].includes(key);
+    return ["GPG", "SA", "GA", "SV", "SVP", "GAA", "W", "SO", "SP", "SPPG"].includes(key);
   }
-  return ["GPS", "G", "A", "PTS", "PPG", "S", "SH"].includes(key);
+  return ["GPS", "G", "A", "PTS", "SP", "SPPG", "PPG", "S", "SH"].includes(key);
 }
 
 function compareByKey(a, b, key, dir, mode) {
@@ -386,8 +424,6 @@ function compareByKey(a, b, key, dir, mode) {
 }
 
 function tieBreak(a, b) {
-  // stable-ish tie break: PTS then name (for skaters), SVP then name (for goalies) is fine,
-  // but simplest is just name.
   return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
 }
 
@@ -395,10 +431,15 @@ function getSortValue(r, key, mode) {
   if (mode === "GOALIE") {
     switch (key) {
       case "GPG": return r.gp_g ?? 0;
+      case "SA":  return (r.sa == null ? null : r.sa);
+      case "GA":  return (r.ga == null ? null : r.ga);
+      case "SV":  return (r.sv == null ? null : r.sv);
       case "SVP": return (r.svp == null ? null : r.svp); // 0-1
-      case "GAA": return (r.gaa == null ? null : r.gaa); // numeric
+      case "GAA": return (r.gaa == null ? null : r.gaa);
       case "W":   return (r.w == null ? null : r.w);
       case "SO":  return (r.so == null ? null : r.so);
+      case "SP":  return (r.sp == null ? null : r.sp);
+      case "SPPG":return (r.spg == null ? null : r.spg);
       default:    return null;
     }
   }
@@ -409,6 +450,8 @@ function getSortValue(r, key, mode) {
     case "G":   return r.g ?? 0;
     case "A":   return r.a ?? 0;
     case "PTS": return r.pts ?? 0;
+    case "SP":  return (r.sp == null ? null : r.sp);
+    case "SPPG":return (r.spg == null ? null : r.spg);
     case "PPG": return (r.ppg == null ? null : r.ppg);
     case "S":   return (r.shots == null ? null : r.shots);
     case "SH":  return (r.shRate == null ? null : r.shRate); // 0-1
@@ -496,10 +539,15 @@ function renderHeader(mode, advOn) {
   if (mode === "GOALIE") {
     cols.push(
       { label: "GP", cls: "num", key: "GPG" },
+      { label: "SA", cls: "num", key: "SA" },
+      { label: "GA", cls: "num", key: "GA" },
+      { label: "Sv", cls: "num", key: "SV" },
       { label: "SV%", cls: "num", key: "SVP" },
       { label: "GAA", cls: "num", key: "GAA" },
       { label: "W", cls: "num", key: "W" },
       { label: "SO", cls: "num", key: "SO" },
+      { label: "SP", cls: "num", key: "SP" },
+      { label: "SP/GP", cls: "num", key: "SPPG" },
     );
   } else {
     cols.push(
@@ -507,6 +555,8 @@ function renderHeader(mode, advOn) {
       { label: "G", cls: "num", key: "G" },
       { label: "A", cls: "num", key: "A" },
       { label: "PTS", cls: "num", key: "PTS" },
+      { label: "SP", cls: "num", key: "SP" },
+      { label: "SP/GP", cls: "num", key: "SPPG" },
       { label: "P/GP", cls: "num", key: "PPG" },
       { label: "S", cls: "num", key: "S" },
       { label: "SH%", cls: "num", key: "SH" },

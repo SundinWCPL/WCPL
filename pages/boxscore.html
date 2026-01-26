@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>WCPL — Boxscore</title>
+
+  <link rel="stylesheet" href="../css/main.css" />
+  <link rel="stylesheet" href="../css/tables.css" />
+  <link rel="stylesheet" href="../css/boxscore.css" />
+</head>
+
+<body class="boxscore-page">
+  <header class="site-header">
+    <a class="brand" href="../index.html">
+      <img src="../assets/wcpl_logo.png" alt="WCPL" class="league-logo" />
+    </a>
+
+    <nav class="nav">
+      <a href="teams.html">Teams</a>
+      <a href="players.html">Players</a>
+      <a href="games.html">Games</a>
+    </nav>
+
+    <div class="header-right">
+      <label class="season-picker">
+        <span>Season</span>
+        <select id="seasonSelect"></select>
+      </label>
+    </div>
+  </header>
+
+  <main class="page">
+    <h1>Boxscore</h1>
+
+    <div id="status" class="status">Loading…</div>
+
+<section id="scoreboard" class="scoreboard" hidden>
+  <div id="resultLabel" class="result-label"></div>
+  <div id="scorePill"></div>
+</section>
+
+
+    <div id="banner" class="banner" hidden></div>
+
+    <section id="summary" class="two-col" hidden>
+      <div class="card">
+        <div class="card-title" id="homeSummaryTitle">Home</div>
+        <div class="card-body" id="homeSummary"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title" id="awaySummaryTitle">Away</div>
+        <div class="card-body" id="awaySummary"></div>
+      </div>
+    </section>
+
+    <section id="previewRosters" class="two-col" hidden>
+      <div class="card">
+        <div class="card-title" id="homeRosterTitle">Home Roster</div>
+
+        <h3 class="subhead">Skaters</h3>
+        <div class="table-wrap">
+          <table id="homeSkaters" class="data-table" hidden>
+            <thead></thead><tbody></tbody>
+          </table>
+        </div>
+
+        <h3 class="subhead">Goalies</h3>
+        <div class="table-wrap">
+          <table id="homeGoalies" class="data-table" hidden>
+            <thead></thead><tbody></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title" id="awayRosterTitle">Away Roster</div>
+
+        <h3 class="subhead">Skaters</h3>
+        <div class="table-wrap">
+          <table id="awaySkaters" class="data-table" hidden>
+            <thead></thead><tbody></tbody>
+          </table>
+        </div>
+
+        <h3 class="subhead">Goalies</h3>
+        <div class="table-wrap">
+          <table id="awayGoalies" class="data-table" hidden>
+            <thead></thead><tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section id="playedBoxscore" class="two-col" hidden>
+      <div class="card">
+        <div class="card-title" id="homePlayedTitle">Home</div>
+
+        <h3 class="subhead">Skaters</h3>
+        <div class="table-wrap">
+          <table id="homeGameSkaters" class="data-table" hidden>
+            <thead></thead><tbody></tbody>
+          </table>
+        </div>
+
+        <h3 class="subhead">Goalies</h3>
+        <div class="table-wrap">
+          <table id="homeGameGoalies" class="data-table" hidden>
+            <thead></thead><tbody></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title" id="awayPlayedTitle">Away</div>
+
+        <h3 class="subhead">Skaters</h3>
+        <div class="table-wrap">
+          <table id="awayGameSkaters" class="data-table" hidden>
+            <thead></thead><tbody></tbody>
+          </table>
+        </div>
+
+        <h3 class="subhead">Goalies</h3>
+        <div class="table-wrap">
+          <table id="awayGameGoalies" class="data-table" hidden>
+            <thead></thead><tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script type="module" src="../js/boxscore.js"></script>
+</body>
+</html>

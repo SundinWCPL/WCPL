@@ -274,6 +274,24 @@ function scrollScheduleToMostRecent(items) {
 function buildScheduleCard(seasonId, it, gameByMatch, allItems) {
   const card = document.createElement("div");
   card.className = "sched-card";
+  
+  // Click anywhere on the card -> boxscore
+card.tabIndex = 0;
+card.setAttribute("role", "link");
+card.setAttribute("aria-label", `Open boxscore for ${it.match_id}`);
+
+const href = boxscoreHref(seasonId, it.match_id);
+
+card.addEventListener("click", () => {
+  window.location.href = href;
+});
+
+card.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" || e.key === " ") {
+    e.preventDefault();
+    window.location.href = href;
+  }
+});
 
   // ----- Top label -----
   const top = document.createElement("div");
@@ -1050,4 +1068,11 @@ function gameNumFromMatchId(matchId) {
 function teamLogoUrl(seasonId, teamId) {
   if (!teamId) return "";
   return `logos/${seasonId}/${teamId}.png`;
+}
+
+function boxscoreHref(seasonId, matchId){
+  // index.html lives in root, but keep this resilient if you ever reuse on a /pages/ file
+  const inPages = (window.location.pathname || "").includes("/pages/");
+  const base = inPages ? "boxscore.html" : "pages/boxscore.html";
+  return `${base}?season=${encodeURIComponent(seasonId)}&match_id=${encodeURIComponent(matchId)}`;
 }
