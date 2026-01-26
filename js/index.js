@@ -237,28 +237,33 @@ function renderSchedule(seasonId) {
     return;
   }
 
-  for (const it of items) {
-    elStrip.appendChild(buildScheduleCard(seasonId, it, gameByMatch, items));
+  // Group into series/matchups (one card per matchup)
+  const groups = groupScheduleIntoSeries(items);
+
+  for (const grp of groups) {
+    elStrip.appendChild(buildSeriesCard(seasonId, grp.items));
   }
 
-  scrollScheduleToMostRecent(items);
+  // Scroll to the series that contains the most recent played game
+  scrollSeriesToMostRecent(items, groups);
 }
 
-function scrollScheduleToMostRecent(items) {
-  // Prefer: last played game. If none played, first unplayed.
-  let idx = -1;
+function scrollSeriesToMostRecent(items, groups) {
+  // Find the most recent played game; if none played, first scheduled.
+  let it = null;
   for (let i = items.length - 1; i >= 0; i--) {
-    if (items[i].played) { idx = i; break; }
+    if (items[i].played) { it = items[i]; break; }
   }
-  if (idx < 0) {
-    idx = items.findIndex(x => !x.played);
-    if (idx < 0) idx = 0;
+  if (!it) {
+    it = items.find(x => !x.played) || items[0];
   }
+  if (!it) return;
 
-  const card = elStrip.children[idx];
+  const key = seriesGroupKey(it);
+  const idx = groups.findIndex(g => g.key === key);
+  const card = elStrip.children[Math.max(0, idx)];
   if (!card) return;
 
-  // Wait for layout so widths/positions are correct
   requestAnimationFrame(() => {
     const stripRect = elStrip.getBoundingClientRect();
     const cardRect = card.getBoundingClientRect();
@@ -327,6 +332,187 @@ card.addEventListener("keydown", (e) => {
   card.appendChild(foot);
   return card;
 }
+
+/* ----------------------------- series cards ----------------------------- */
+
+// Turn per-game schedule items into matchup groups (one card per matchup)
+function seriesGroupKey(it){
+  const stage = String(it.stage ?? "").trim().toLowerCase();
+
+  // Regular season: every matchup is a 3-game series in a given week.
+  // Group by week + the two teams (stable regardless of home/away order).
+  if (stage === "reg") {
+    const a = String(it.home ?? "").trim();
+    const b = String(it.away ?? "").trim();
+    const x = a < b ? a : b;
+    const y = a < b ? b : a;
+    return `reg|w${it.week}|${x}|${y}`;
+  }
+
+  // Playoffs: group by stage + series prefix (M##)
+  if (it.mprefix) return `${stage}|${it.mprefix}`;
+
+  // Fallback: no prefix found, group per match_id
+  return `${stage}|${String(it.match_id ?? "").trim()}`;
+}
+
+// Turn per-game schedule items into matchup groups (one card per series)
+function groupScheduleIntoSeries(items) {
+  const map = new Map();
+
+  for (const it of items) {
+    const key = seriesGroupKey(it);
+
+    if (!map.has(key)) {
+      map.set(key, {
+        key,
+        sortKey: it.sortKey ?? 0,
+        items: [],
+      });
+    }
+    const g = map.get(key);
+    g.items.push(it);
+    g.sortKey = Math.min(g.sortKey, it.sortKey ?? g.sortKey);
+  }
+
+  // Sort games within each series by game number (G1..G5). If gnum is missing, keep original order.
+  for (const g of map.values()) {
+    g.items.sort((a, b) => (a.gnum ?? 0) - (b.gnum ?? 0));
+  }
+
+  return Array.from(map.values()).sort((a, b) => a.sortKey - b.sortKey);
+}
+
+function buildSchedLogo(seasonId, teamId, teamRow) {
+  const logoWrap = document.createElement("div");
+  logoWrap.className = "sched-logo";
+  if (teamRow?.bg_color) logoWrap.style.backgroundColor = teamRow.bg_color;
+
+  const img = document.createElement("img");
+  img.loading = "lazy";
+  img.alt = `${teamId} logo`;
+  img.src = `logos/${seasonId}/${teamId}.png`;
+  img.onerror = () => (img.style.visibility = "hidden");
+  logoWrap.appendChild(img);
+
+  return logoWrap;
+}
+
+function buildSeriesCard(seasonId, seriesItems) {
+  // Expect: same stage + same mprefix
+  const first = seriesItems[0];
+
+  const card = document.createElement("div");
+  card.className = "sched-card series-card";
+
+  // ----- Top label ---
+  const top = document.createElement("div");
+  top.className = "sched-top";
+
+  const phaseName = stageLabel(first.stage);
+
+  // Per your request: REG always shows Week # (even once played)
+  if (String(first.stage ?? "").toLowerCase() === "reg") {
+    top.textContent = `Week ${first.week} - ${phaseName}`;
+  } else {
+    top.textContent = `${phaseName}`;
+  }
+  card.appendChild(top);
+
+  // ----- Body: logos left + games grid right ---
+  const body = document.createElement("div");
+  body.className = "series-body";
+
+  const teamsCol = document.createElement("div");
+  teamsCol.className = "series-teams";
+  teamsCol.appendChild(buildSchedLogo(seasonId, first.away, first.awayTeam));
+  teamsCol.appendChild(buildSchedLogo(seasonId, first.home, first.homeTeam));
+
+  const gamesRow = document.createElement("div");
+  gamesRow.className = "series-games";
+
+  // Compute whether the whole series is "played"
+  const allPlayed = seriesItems.every(x => x.played);
+
+  for (const it of seriesItems) {
+    const cell = document.createElement("div");
+    cell.className = "series-game";
+    cell.tabIndex = 0;
+    cell.setAttribute("role", "link");
+    cell.setAttribute("aria-label", `Open boxscore for ${it.match_id}`);
+
+    const href = boxscoreHref(seasonId, it.match_id);
+
+    cell.addEventListener("click", () => (window.location.href = href));
+    cell.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        window.location.href = href;
+      }
+    });
+
+    // Score line: "A - H" plus OT suffix, and color by winner
+let scoreLine = "";
+
+if (it.played) {
+  const ag = (it.ag ?? 0);
+  const hg = (it.hg ?? 0);
+
+  const awayWon = ag > hg;
+  const homeWon = hg > ag;
+
+scoreLine = `${ag} - ${hg}`;
+
+  // Apply winning team colors from teams.csv
+  const winnerTeam = awayWon ? it.awayTeam : (homeWon ? it.homeTeam : null);
+  if (winnerTeam?.bg_color) cell.style.backgroundColor = winnerTeam.bg_color;
+  if (winnerTeam?.text_color) cell.style.color = winnerTeam.text_color;
+
+  // Optional: make border pop a touch when colored
+  if (winnerTeam) cell.style.borderColor = "rgba(255,255,255,0.22)";
+}
+
+    // Optional tiny game label (G1, G2, ...)
+    const gLabel = document.createElement("div");
+    gLabel.className = "series-glabel";
+    const otMark = (it.played && (it.ot ?? 0) > 0) ? "*" : "";
+gLabel.textContent = it.gnum ? `G${it.gnum}${otMark}` : "";
+
+const scoreDiv = document.createElement("div");
+scoreDiv.className = "series-scoreline";
+scoreDiv.textContent = scoreLine;
+
+cell.appendChild(scoreDiv);
+cell.appendChild(gLabel);
+
+    gamesRow.appendChild(cell);
+  }
+
+  body.appendChild(teamsCol);
+  body.appendChild(gamesRow);
+  card.appendChild(body);
+
+  // ----- Footer status -----
+  const foot = document.createElement("div");
+  foot.className = "sched-foot";
+
+  if (!allPlayed) {
+    foot.textContent = "Scheduled";
+} else {
+  const st = String(first.stage ?? "").toLowerCase();
+
+  if (st === "qf" || st === "sf" || st === "f") {
+    foot.textContent = `Final - ${seriesWinNoteFromSeries(seasonId, st, seriesItems)}`;
+  } else {
+    foot.textContent = "Final";
+  }
+}
+
+  card.appendChild(foot);
+  return card;
+}
+
+/* ---------------- series + label helpers ---------------- */
 
 /* ---------------- series + label helpers ---------------- */
 
@@ -1075,4 +1261,36 @@ function boxscoreHref(seasonId, matchId){
   const inPages = (window.location.pathname || "").includes("/pages/");
   const base = inPages ? "boxscore.html" : "pages/boxscore.html";
   return `${base}?season=${encodeURIComponent(seasonId)}&match_id=${encodeURIComponent(matchId)}`;
+}
+
+function seriesWinNoteFromSeries(seasonId, stage, seriesItems){
+  // Count wins across the series
+  const wins = new Map(); // team_id -> wins
+
+  for (const g of seriesItems) {
+    if (!g.played || g.hg === null || g.ag === null) continue;
+    const winner = (g.hg > g.ag) ? g.home : g.away;
+    wins.set(winner, (wins.get(winner) ?? 0) + 1);
+  }
+
+  // Find top winner
+  let bestTeam = null;
+  let bestWins = -1;
+  for (const [tid, w] of wins.entries()) {
+    if (w > bestWins) { bestWins = w; bestTeam = tid; }
+  }
+  if (!bestTeam) return "";
+
+  // Determine opponent + their wins (simple, since seriesItems all share the same two teams)
+  const first = seriesItems[0];
+  const otherTeam = (bestTeam === first.home) ? first.away : first.home;
+  const otherWins = wins.get(otherTeam) ?? 0;
+
+  // Finals special wording
+  if (stage === "f") {
+    const n = seasonNumberFromId(seasonId);
+    return `${bestTeam} wins WCPL Season ${n ?? seasonId}`;
+  }
+
+  return `${bestTeam} wins series ${bestWins}-${otherWins}`;
 }

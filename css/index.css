@@ -69,7 +69,7 @@
 
 /* Schedule cards */
 .sched-card{
-  flex: 0 0 200px;           /* card width */
+  flex: 0 0 280px;           /* card width */
   border: 1px solid #232a35;
   border-radius: 12px;
   background: rgba(255,255,255,0.02);
@@ -83,6 +83,7 @@
   font-size: 11px;
   opacity: 0.9;
   margin-bottom: 4px;
+  text-align: center;
 }
 
 .sched-row{
@@ -148,6 +149,72 @@
   font-weight: 600;
   font-size: 11px;
   opacity: 1;
+  text-align: center;
+}
+
+/* Series (matchup) layout inside schedule cards */
+.series-body{
+  display:flex;
+  align-items:stretch;
+  gap:10px;
+  margin-top: 4px;
+}
+
+.series-teams{
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+  justify-content:center;
+  flex: 0 0 auto;
+}
+
+.series-teams .sched-logo{
+  width: 30px;
+  height: 30px;
+  border-radius: 10px;
+}
+
+.series-games{
+  display:flex;
+  gap:6px;
+  align-items:center;
+  flex: 1 1 auto;
+}
+
+.series-game{
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(0,0,0,0.22);
+  border-radius: 10px;
+  padding: 6px 8px 5px;
+  min-width: 40px;
+  text-align:center;
+  cursor:pointer;
+  user-select:none;
+  flex: 1 1 0;
+}
+
+.series-game:hover{
+  border-color: rgba(255,255,255,0.22);
+  background: rgba(255,255,255,0.04);
+}
+
+.series-game:focus-visible{
+  outline: 2px solid rgba(255,255,255,0.22);
+  outline-offset: 2px;
+}
+
+.series-score{
+  font-size: 14px;
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+
+.series-glabel{
+  margin-top: 3px;
+  font-size: 10px;
+  opacity: 0.75;
+  font-weight: 700;
 }
 
 /* Two cards under schedule */
@@ -307,12 +374,14 @@
 
 .series-top{
   display:flex;
-  justify-content:space-between;
+  justify-content:center;   /* THIS is the key */
+  align-items:center;
   gap:10px;
   font-weight: 700;
   font-size: 11px;
   opacity: 0.9;
   margin-bottom: 6px;
+  text-align: center;
 }
 
 .series-teams{
@@ -351,7 +420,10 @@
   font-weight: 650;
   font-size: 11px;
   opacity: 0.95;
+  text-align: center;
+  width: 100%;
 }
+
 
 /* Bracket pills: winner/loser emphasis */
 .series-team.is-winner{
@@ -447,6 +519,18 @@
   filter: saturate(0.7);
 }
 
+.series-scoreline{
+  font-size: 13px;
+  font-weight: 850;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+  white-space: nowrap;
 }
 
+.series-glabel{
+  margin-top: 4px;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.2px;
+}
 
