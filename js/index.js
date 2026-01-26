@@ -425,8 +425,8 @@ function buildSeriesCard(seasonId, seriesItems) {
 
   const teamsCol = document.createElement("div");
   teamsCol.className = "series-teams";
-  teamsCol.appendChild(buildSchedLogo(seasonId, first.away, first.awayTeam));
-  teamsCol.appendChild(buildSchedLogo(seasonId, first.home, first.homeTeam));
+teamsCol.appendChild(buildSchedLogo(seasonId, first.home, first.homeTeam));
+teamsCol.appendChild(buildSchedLogo(seasonId, first.away, first.awayTeam));
 
   const gamesRow = document.createElement("div");
   gamesRow.className = "series-games";
@@ -461,7 +461,9 @@ if (it.played) {
   const awayWon = ag > hg;
   const homeWon = hg > ag;
 
-scoreLine = `${ag} - ${hg}`;
+const hi = Math.max(hg, ag);
+const lo = Math.min(hg, ag);
+scoreLine = `${hi} - ${lo}`;
 
   // Apply winning team colors from teams.csv
   const winnerTeam = awayWon ? it.awayTeam : (homeWon ? it.homeTeam : null);
