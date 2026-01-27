@@ -12,6 +12,7 @@
 
 /* --- Table base tweaks (scoped) --- */
 #gamesTable {
+  width: 100%;
   table-layout: fixed;
 }
 
@@ -41,6 +42,13 @@
   min-width: 110px;
 }
 
+/* In playoffs view, don't reserve space for empty G4/G5 cells */
+#gamesTable.show-5 td.result-cell:empty::after{
+  min-width: 0;
+  width: 0;
+  display: none;
+}
+
 /* Ensure pills are visually centered and consistent */
 #gamesTable .result-pill {
   display: inline-flex;
@@ -54,25 +62,76 @@
   white-space: nowrap;
 }
 
+/* Score pills: add team-colored outline (slightly lighter) */
+.result-pill{
+  border: 2px solid color-mix(in srgb, var(--team-bg, #2a3340) 70%, #ffffff);
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.35);
+}
+
+/* Fallback for browsers that don't support color-mix (rare on modern Chrome) */
+@supports not (color: color-mix(in srgb, #000 50%, #fff)){
+  .result-pill{
+    border-color: rgba(255,255,255,0.18);
+  }
+}
+
+
 /* --- Hide G4 / G5 unless playoffs are selected --- */
 /* Column index reference:
-   1 Week/Stage
-   2 Home
-   3 VS
-   4 Away
-   5 Spacer
-   6 G1
-   7 G2
-   8 G3
-   9 G4
-   10 G5
-   11 Date
+   1 Home
+   2 VS
+   3 Away
+   4 Spacer
+   5 G1
+   6 G2
+   7 G3
+   8 G4
+   9 G5
+   10 Date
 */
+#gamesTable:not(.show-5) th:nth-child(8),
+#gamesTable:not(.show-5) td:nth-child(8),
 #gamesTable:not(.show-5) th:nth-child(9),
-#gamesTable:not(.show-5) td:nth-child(9),
-#gamesTable:not(.show-5) th:nth-child(10),
-#gamesTable:not(.show-5) td:nth-child(10) {
+#gamesTable:not(.show-5) td:nth-child(9) {
   display: none;
+}
+
+/* Tighten regular-season widths + remove phantom width from hidden cols */
+#gamesTable col:nth-child(5),
+#gamesTable col:nth-child(6),
+#gamesTable col:nth-child(7){
+  width: 120px !important; /* G1–G3 (regular season) */
+}
+
+/* When NOT showing 5 games, collapse the G4/G5 columns in the colgroup too */
+#gamesTable:not(.show-5) col:nth-child(8),
+#gamesTable:not(.show-5) col:nth-child(9){
+  width: 0 !important;
+}
+
+
+/* --- Group header rows (Week / Playoffs round) --- */
+#gamesTable tr.group-row td{
+  padding: 14px 0;          /* remove side padding so centering is real */
+  text-align: center;       /* true horizontal centering */
+  font-size: 15px;          /* bump size (try 16px if you want louder) */
+  font-weight: 900;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+
+  opacity: 0.95;
+  background: rgba(255,255,255,0.035);
+  border-top: 2px solid rgba(255,255,255,0.14);
+  border-bottom: 1px solid rgba(255,255,255,0.10);
+}
+
+
+#gamesTable tr.group-row td .group-sub{
+  font-weight: 700;
+  opacity: 0.8;
+  margin-left: 10px;
+  text-transform: none;
+  letter-spacing: 0;
 }
 
 /* --- Stage / Week column --- */
@@ -153,3 +212,25 @@
   gap: 16px;
 }
 
+/* Prevent phantom horizontal scroll */
+.games-table-wrapper,
+.games-table-container,
+#gamesTable {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+/* Slightly slimmer home/away to reclaim space */
+#gamesTable col:nth-child(1),
+#gamesTable col:nth-child(3){
+  width: 120px !important;
+}
+
+/* Playoffs: keep G1–G5 identical width so spacing is uniform */
+#gamesTable.show-5 col:nth-child(5),
+#gamesTable.show-5 col:nth-child(6),
+#gamesTable.show-5 col:nth-child(7),
+#gamesTable.show-5 col:nth-child(8),
+#gamesTable.show-5 col:nth-child(9){
+  width: 120px !important;   /* match your G1–G3 size */
+}

@@ -561,8 +561,9 @@ function renderTeamMissingInSeason(seasonId, teamId, seasons) {
   elLogo.style.visibility = "hidden";
 
   // Reset theme vars so it doesn't inherit the previous team
-  document.documentElement.style.setProperty("--team-bg", "#0f1319");
-  document.documentElement.style.setProperty("--team-fg", "#e7e7e7");
+  document.documentElement.style.setProperty("--team-bg", bg);
+  document.documentElement.style.setProperty("--team-fg", fg);
+  elHero.classList.add("team-themed");
 
   // Clear tables
   skatersBody.innerHTML = "";

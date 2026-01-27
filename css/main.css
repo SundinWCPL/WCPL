@@ -214,6 +214,30 @@ h1 {
   display: block;
 }
 
+/* Player page: team-colored outline around hero card */
+#playerHero.team-themed{
+  border: 2px solid color-mix(
+    in srgb,
+    var(--team-bg, #2a3340) 70%,
+    #ffffff
+  );
+  box-shadow:
+    0 0 0 1px rgba(0,0,0,0.35),
+    0 8px 24px rgba(0,0,0,0.45);
+}
+
+/* Team page: team-colored outline around hero card */
+#teamHero.team-themed{
+  border: 2px solid color-mix(
+    in srgb,
+    var(--team-bg, #2a3340) 70%,
+    #ffffff
+  );
+  box-shadow:
+    0 0 0 1px rgba(0,0,0,0.35),
+    0 8px 24px rgba(0,0,0,0.45);
+}
+
 /* Inline header controls (Player page) */
 .stats-header {
   display: flex;
@@ -244,4 +268,14 @@ h1 {
   opacity: 0.8;
 }
 
+/* Body stays neutral */
+body.team-page .card .card-body{
+  background: #0f1319;
+  color: #d7dde6;
+}
 
+/* Tables stay neutral/readable */
+body.team-page .card .data-table th,
+body.team-page .card .data-table td{
+  color: inherit;
+}

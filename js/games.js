@@ -255,53 +255,79 @@ rows.sort((a, b) => {
   // Render
   elTbody.innerHTML = "";
 
-  for (const r of rows) {
-    const tr = document.createElement("tr");
+// Render
+elTbody.innerHTML = "";
 
-    // Week number only
-    const tdWeek = document.createElement("td");
-    tdWeek.textContent = stageLabel(r.stage, r.week);
-	tdWeek.style.textAlign = "center";
-    tr.appendChild(tdWeek);
-	
-	const homeOutcome = r.winner_id
-  ? (r.winner_id === r.home_team_id ? "win" : "lose")
-  : null;
+// Insert group header rows (Week blocks in regular season; Round blocks in playoffs)
+let lastGroupKey = null;
 
-	const awayOutcome = r.winner_id
-  ? (r.winner_id === r.away_team_id ? "win" : "lose")
-  : null;
+const addGroupHeaderRow = (label, subLabel = "") => {
+  const trGroup = document.createElement("tr");
+  trGroup.className = "group-row";
 
+  const td = document.createElement("td");
+  td.colSpan = 10; // Week column removed; total columns = 10
+  td.textContent = label;
 
-	const home = tmap.get(r.home_team_id) || fallbackTeam(r.home_team_id);
-	tr.appendChild(tdTeamLogoOnly(home, seasonId, homeOutcome));
-
-	const tdVs = document.createElement("td");
-	tdVs.className = "vs-cell";
-	tdVs.textContent = "VS";
-	tr.appendChild(tdVs);
-
-	const away = tmap.get(r.away_team_id) || fallbackTeam(r.away_team_id);
-	tr.appendChild(tdTeamLogoOnly(away, seasonId, awayOutcome));
-
-	// Spacer column
-	const tdSpacer = document.createElement("td");
-	tdSpacer.className = "spacer-col";
-	tr.appendChild(tdSpacer);
-
-	tr.appendChild(tdGameResult(r.g1, seasonId));
-	tr.appendChild(tdGameResult(r.g2, seasonId));
-	tr.appendChild(tdGameResult(r.g3, seasonId));
-	tr.appendChild(tdGameResult(r.g4, seasonId));
-	tr.appendChild(tdGameResult(r.g5, seasonId));
-
-    const tdDate = document.createElement("td");
-    tdDate.textContent = formatDate(r.date);
-	tdDate.style.textAlign = "center";
-    tr.appendChild(tdDate);
-
-    elTbody.appendChild(tr);
+  if (subLabel) {
+    const span = document.createElement("span");
+    span.className = "group-sub";
+    span.textContent = subLabel;
+    td.appendChild(span);
   }
+
+  trGroup.appendChild(td);
+  elTbody.appendChild(trGroup);
+};
+
+for (const r of rows) {
+  const gk = groupKeyForRow(r, stageMode);
+  if (gk !== lastGroupKey) {
+    const { label, sub } = groupLabelForRow(r, stageMode);
+    addGroupHeaderRow(label, sub);
+    lastGroupKey = gk;
+  }
+
+  const tr = document.createElement("tr");
+
+  const homeOutcome = r.winner_id
+    ? (r.winner_id === r.home_team_id ? "win" : "lose")
+    : null;
+
+  const awayOutcome = r.winner_id
+    ? (r.winner_id === r.away_team_id ? "win" : "lose")
+    : null;
+
+  const home = tmap.get(r.home_team_id) || fallbackTeam(r.home_team_id);
+  tr.appendChild(tdTeamLogoOnly(home, seasonId, homeOutcome));
+
+  const tdVs = document.createElement("td");
+  tdVs.className = "vs-cell";
+  tdVs.textContent = "VS";
+  tr.appendChild(tdVs);
+
+  const away = tmap.get(r.away_team_id) || fallbackTeam(r.away_team_id);
+  tr.appendChild(tdTeamLogoOnly(away, seasonId, awayOutcome));
+
+  const tdSpacer = document.createElement("td");
+  tdSpacer.className = "spacer-col";
+  tr.appendChild(tdSpacer);
+
+  tr.appendChild(tdGameResult(r.g1, seasonId));
+  tr.appendChild(tdGameResult(r.g2, seasonId));
+  tr.appendChild(tdGameResult(r.g3, seasonId));
+  tr.appendChild(tdGameResult(r.g4, seasonId));
+  tr.appendChild(tdGameResult(r.g5, seasonId));
+
+  const tdDate = document.createElement("td");
+  tdDate.textContent = formatDate(r.date);
+  tdDate.style.textAlign = "center";
+  tr.appendChild(tdDate);
+
+  elTbody.appendChild(tr);
+}
+
+elTable.hidden = false;
 
   elTable.hidden = false;
 }
@@ -371,9 +397,12 @@ function tdGameResult(game, seasonId) {
   const pill = document.createElement("span");
   pill.className = "result-pill";
 
-  // theme by winning team colors
+  // theme by winning team colors (+ expose CSS var for outline)
   const winTeam = getTeam(winTeamId);
-  if (winTeam?.bg_color) pill.style.backgroundColor = winTeam.bg_color;
+  if (winTeam?.bg_color) {
+    pill.style.backgroundColor = winTeam.bg_color;
+    pill.style.setProperty("--team-bg", winTeam.bg_color);
+  }
   if (winTeam?.text_color) pill.style.color = winTeam.text_color;
 
   pill.textContent = `${winScore} - ${loseScore} ${winTeamId}${otTag}`;
@@ -456,4 +485,26 @@ function stageLabel(stage, week) {
   if (stage === "sf") return "SF";
   if (stage === "f")  return "F";
   return stage ? stage.toUpperCase() : "";
+}
+
+function stageLabelLong(stage) {
+  if (stage === "qf") return "Quarter Finals";
+  if (stage === "sf") return "Semi Finals";
+  if (stage === "f")  return "WCPL Championship";
+  return stage ? stage.toUpperCase() : "";
+}
+
+function groupKeyForRow(r, stageMode) {
+  // Playoffs: group by round (qf/sf/f)
+  if (stageMode === "po") return String(r.stage ?? "");
+  // Regular: group by week
+  return String(r.week ?? "");
+}
+
+function groupLabelForRow(r, stageMode) {
+  if (stageMode === "po") {
+    return { label: stageLabelLong(String(r.stage ?? "")), sub: "" };
+  }
+  const wk = (r.week ?? "");
+  return { label: `Week ${wk}`, sub: "" };
 }
