@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>WCPL — Fantasy</title>
+
+  <link rel="stylesheet" href="../css/main.css" />
+  <link rel="stylesheet" href="../css/tables.css" />
+</head>
+
+<style>
+/* Small page-specific tweaks (keeps overall site styling consistent) */
+/* Keep table from stretching too wide */
+.table-wrap{
+  max-width: 800px;   /* tweak to taste: 850–950 feels good */
+  margin: 0 auto;
+}
+
+/* Column sizing */
+#fantasyTable th:nth-child(1),
+#fantasyTable td.team-cell{
+  width: 100px;
+  max-width: 100px;
+}
+
+#fantasyTable th:nth-child(2),
+#fantasyTable td:nth-child(2){
+  width: 40px;
+  max-width: 40px;
+}
+
+#fantasyTable th:nth-child(3),
+#fantasyTable td.sp-cell{
+  width: 50px;
+}
+
+#fantasyTable th:nth-child(4),
+#fantasyTable td.total-sp{
+  width: 120px;
+}
+#fantasyTable tr.team-start td{
+  border-top: 2px solid rgba(255,255,255,0.45);
+}
+/* ============================
+   Fantasy table typography
+   ============================ */
+
+/* Team name (row value, not header) */
+#fantasyTable td.team-cell{
+  font-size: 1.05rem;
+  font-weight: 800;
+}
+
+/* Center ALL SP values (rowspan-safe) */
+#fantasyTable td.sp-cell{
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Total SP emphasis */
+#fantasyTable td.total-sp{
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  font-size: 1.45rem;
+  font-weight: 900;
+  letter-spacing: 0.5px;
+}
+
+/* Optional: slightly tighten vertical spacing so it still feels compact */
+#fantasyTable td{
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+/* Center SP + Total SP headers */
+#fantasyTable th:nth-child(3),
+#fantasyTable th:nth-child(4){
+  text-align: center;
+}
+/* Vertical separators */
+
+/* Team → Players */
+#fantasyTable th:nth-child(1),
+#fantasyTable td.team-cell{
+  border-right: 1px solid rgba(255,255,255,0.15);
+}
+
+/* Players → SP (now consistent all the way down) */
+#fantasyTable th:nth-child(2),
+#fantasyTable td.player-cell{
+  border-right: 1px solid rgba(255,255,255,0.15);
+}
+
+/* SP → Total SP (thicker) */
+#fantasyTable th:nth-child(3),
+#fantasyTable td.sp-cell{
+  border-right: 2px solid rgba(255,255,255,0.45);
+}
+/* Player links (fantasy page) */
+#fantasyTable .player-link{
+  color: inherit;          /* keep exact same text color */
+  text-decoration: none;   /* no underline by default */
+  cursor: pointer;
+}
+
+#fantasyTable .player-link:hover{
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-shadow: 0 0 6px rgba(255,255,255,0.15);
+}
+</style>
+
+<body>
+  <header class="site-header">
+    <a class="brand" href="../index.html">
+      <img
+        src="../assets/wcpl_logo.png"
+        alt="WCPL"
+        class="league-logo"
+      />
+    </a>
+
+    <nav class="nav">
+      <a href="teams.html">Teams</a>
+      <a href="players.html">Players</a>
+      <a href="games.html">Games</a>
+	  <a href="charts.html">Charts</a>
+      <a class="active" href="fantasy.html">Fantasy</a>
+    </nav>
+
+    <div class="header-right">
+      <label class="season-picker">
+        <span>Season</span>
+        <select id="seasonSelect"></select>
+      </label>
+    </div>
+  </header>
+
+  <main class="page">
+    <h1><center>WCPL Fantasy</center></h1>
+
+    <section class="controls">
+      <label id="leagueFilterWrap" hidden>
+        League
+        <select id="leagueSelect"></select>
+      </label>
+    </section>
+
+    <div id="status" class="status">Loading…</div>
+
+    <div class="table-wrap">
+      <table id="fantasyTable" class="data-table" hidden>
+        <thead>
+          <tr>
+            <th class="left">Team</th>
+            <th class="left">Players</th>
+            <th class="center">SP</th>
+            <th class="center">Total SP</th>
+          </tr>
+        </thead>
+        <tbody id="fantasyTbody"></tbody>
+      </table>
+    </div>
+  </main>
+
+  <script type="module" src="../js/fantasy.js"></script>
+</body>
+</html>

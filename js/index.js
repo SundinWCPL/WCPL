@@ -117,6 +117,13 @@ schedule = sRows;
 if (elHomeStageSubtitle) {
   elHomeStageSubtitle.textContent = stageMode === "PO" ? "(Playoffs)" : "(Regular Season)";
 }
+// Update Standings title -> Bracket for playoffs
+const standingsTitle = document.querySelector(".card-title.stats-header > span");
+if (standingsTitle) {
+  standingsTitle.childNodes[0].nodeValue =
+    stageMode === "PO" ? "Bracket " : "Standings ";
+}
+
 if (elLeadersStageSubtitle) {
   elLeadersStageSubtitle.textContent = stageMode === "PO" ? "(Playoffs)" : "(Regular Season)";
 }
@@ -1096,6 +1103,33 @@ if (!series.has(key)){
 
     series.get(key).games.push({ g, s });
   }
+// --- Determine Finals champion (if finals series is complete) ---
+let finalsChampionId = null;
+let finalsChampionRow = null;
+
+for (const srs of series.values()) {
+  if (srs.stage !== "f") continue;
+
+  const completed = srs.games.filter(x =>
+    toIntMaybe(x.g.home_goals) !== null && toIntMaybe(x.g.away_goals) !== null
+  );
+
+  const scheduledN = maxGamesBySeries.get(srs.sid) ?? 0;
+  const seriesFinal = (scheduledN > 0 && completed.length >= scheduledN);
+  if (!seriesFinal || !completed.length) continue;
+
+  const last = completed[completed.length - 1];
+  const home = String(last.g.home_team_id ?? "").trim();
+  const away = String(last.g.away_team_id ?? "").trim();
+  const hs = toIntMaybe(last.g.home_goals);
+  const as = toIntMaybe(last.g.away_goals);
+  if (hs === null || as === null) continue;
+
+  finalsChampionId = (hs > as) ? home : away;
+  finalsChampionRow = teamById.get(finalsChampionId) || null;
+
+  break; // only one finals series expected
+}
 
   // build columns QF/SF/F
   const rounds = [
@@ -1241,7 +1275,10 @@ if (seriesFinal && winner) {
 
   col.appendChild(card);
 }
-
+// If this is Finals column and we have a champion, add the champion card
+if (r.st === "f" && finalsChampionId) {
+  col.appendChild(buildChampionCard(seasonId, finalsChampionId, finalsChampionRow));
+}
     elHomePlayoffsWrap.appendChild(col);
   }
 }
@@ -1263,6 +1300,44 @@ function boxscoreHref(seasonId, matchId){
   const inPages = (window.location.pathname || "").includes("/pages/");
   const base = inPages ? "boxscore.html" : "pages/boxscore.html";
   return `${base}?season=${encodeURIComponent(seasonId)}&match_id=${encodeURIComponent(matchId)}`;
+}
+function buildChampionCard(seasonId, champTeamId, champTeamRow) {
+  const card = document.createElement("div");
+  card.className = "series-card champion-card";
+
+  const inner = document.createElement("div");
+  inner.className = "champion-row";
+
+  // use team colors if present
+  if (champTeamRow?.bg_color) inner.style.setProperty("--team-bg", String(champTeamRow.bg_color).trim());
+  if (champTeamRow?.text_color) inner.style.setProperty("--team-fg", String(champTeamRow.text_color).trim());
+
+  const logo = document.createElement("img");
+  logo.className = "pill-logo champ-logo";
+  logo.src = teamLogoUrl(seasonId, champTeamId);
+  logo.alt = "";
+  logo.onerror = () => (logo.style.visibility = "hidden");
+
+  const textWrap = document.createElement("div");
+  textWrap.className = "champion-text";
+
+  const teamLine = document.createElement("div");
+  teamLine.className = "champion-team";
+  teamLine.textContent = String(champTeamRow?.team_name ?? champTeamId ?? "").trim();
+
+  const seasonNum = seasonNumberFromId(seasonId);
+  const champLine = document.createElement("div");
+  champLine.className = "champion-sub";
+  champLine.textContent = `WCPL SEASON ${seasonNum ?? seasonId} CHAMPIONS`;
+
+  textWrap.appendChild(teamLine);
+  textWrap.appendChild(champLine);
+
+  inner.appendChild(logo);
+  inner.appendChild(textWrap);
+
+  card.appendChild(inner);
+  return card;
 }
 
 function seriesWinNoteFromSeries(seasonId, stage, seriesItems){

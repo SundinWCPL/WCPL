@@ -371,21 +371,23 @@ function render() {
       tr.appendChild(tdNumMaybe(r.sp, 1));
       tr.appendChild(tdNumMaybe(r.spg, 2));
     } else {
-      tr.appendChild(tdNum(r.gp_s));
-      tr.appendChild(tdNum(r.g));
-      tr.appendChild(tdNum(r.a));
-      tr.appendChild(tdNum(r.pts));
-      tr.appendChild(tdNumMaybe(r.sp, 1));
-      tr.appendChild(tdNumMaybe(r.spg, 2));
-      tr.appendChild(tdNumMaybe(r.ppg, 2));
-      tr.appendChild(tdNumMaybe(r.shots));
-      tr.appendChild(tdPctMaybe(r.shRate !== null ? r.shRate * 100 : null, 1));
+tr.appendChild(tdNum(r.gp_s));
+tr.appendChild(tdNum(r.g));
+tr.appendChild(tdNum(r.a));
+tr.appendChild(tdNum(r.pts));
+tr.appendChild(tdNumMaybe(r.ppg, 2));
+tr.appendChild(tdNumMaybe(r.shots));
+tr.appendChild(tdPctMaybe(r.shRate !== null ? r.shRate * 100 : null, 1));
 
-      if (advOn) {
-        tr.appendChild(tdNumMaybe(r.hits, null, true));
-        tr.appendChild(tdNumMaybe(r.ta, null, true));
-        tr.appendChild(tdNumMaybe(r.to, null, true));
-      }
+if (advOn) {
+  tr.appendChild(tdNumMaybe(r.hits, null, true));
+  tr.appendChild(tdNumMaybe(r.ta, null, true));
+  tr.appendChild(tdNumMaybe(r.to, null, true));
+}
+
+// SP columns at the very end
+tr.appendChild(tdNumMaybe(r.sp, 1));
+tr.appendChild(tdNumMaybe(r.spg, 2));
     }
 
     elTbody.appendChild(tr);
@@ -401,7 +403,7 @@ function isSortKeyAllowedForMode(key, mode) {
   if (mode === "GOALIE") {
     return ["GPG", "SA", "GA", "SV", "SVP", "GAA", "W", "SO", "SP", "SPPG"].includes(key);
   }
-  return ["GPS", "G", "A", "PTS", "SP", "SPPG", "PPG", "S", "SH"].includes(key);
+  return ["GPS", "G", "A", "PTS", "PPG", "S", "SH", "SP", "SPPG"].includes(key);
 }
 
 function compareByKey(a, b, key, dir, mode) {
@@ -450,11 +452,11 @@ function getSortValue(r, key, mode) {
     case "G":   return r.g ?? 0;
     case "A":   return r.a ?? 0;
     case "PTS": return r.pts ?? 0;
-    case "SP":  return (r.sp == null ? null : r.sp);
-    case "SPPG":return (r.spg == null ? null : r.spg);
     case "PPG": return (r.ppg == null ? null : r.ppg);
     case "S":   return (r.shots == null ? null : r.shots);
     case "SH":  return (r.shRate == null ? null : r.shRate); // 0-1
+	case "SP":  return (r.sp == null ? null : r.sp);
+    case "SPPG":return (r.spg == null ? null : r.spg);
     default:    return null;
   }
 }
@@ -551,24 +553,28 @@ function renderHeader(mode, advOn) {
     );
   } else {
     cols.push(
-      { label: "GP", cls: "num", key: "GPS" },
-      { label: "G", cls: "num", key: "G" },
-      { label: "A", cls: "num", key: "A" },
-      { label: "PTS", cls: "num", key: "PTS" },
-      { label: "SP", cls: "num", key: "SP" },
-      { label: "SP/GP", cls: "num", key: "SPPG" },
-      { label: "P/GP", cls: "num", key: "PPG" },
-      { label: "S", cls: "num", key: "S" },
-      { label: "SH%", cls: "num", key: "SH" },
-    );
+  { label: "GP", cls: "num", key: "GPS" },
+  { label: "G", cls: "num", key: "G" },
+  { label: "A", cls: "num", key: "A" },
+  { label: "PTS", cls: "num", key: "PTS" },
+  { label: "P/GP", cls: "num", key: "PPG" },
+  { label: "S", cls: "num", key: "S" },
+  { label: "SH%", cls: "num", key: "SH" },
+);
 
-    if (advOn) {
-      cols.push(
-        { label: "HIT", cls: "num adv" }, // not sortable
-        { label: "TA", cls: "num adv" },  // not sortable
-        { label: "TO", cls: "num adv" },  // not sortable
-      );
-    }
+if (advOn) {
+  cols.push(
+    { label: "HIT", cls: "num adv" },
+    { label: "TA", cls: "num adv" },
+    { label: "TO", cls: "num adv" },
+  );
+}
+
+// SP columns always at the very end
+cols.push(
+  { label: "SP", cls: "num", key: "SP" },
+  { label: "SP/GP", cls: "num", key: "SPPG" },
+);
   }
 
   const tr = document.createElement("tr");

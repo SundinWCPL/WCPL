@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>WCPL — Charts</title>
+
+  <link rel="stylesheet" href="../css/main.css" />
+  <link rel="stylesheet" href="../css/tables.css" />
+  <link rel="stylesheet" href="../css/charts.css" />
+</head>
+
+<body>
+  <header class="site-header">
+    <a class="brand" href="../index.html">
+      <img
+        src="../assets/wcpl_logo.png"
+        alt="WCPL"
+        class="league-logo"
+      />
+    </a>
+
+    <nav class="nav">
+      <a href="teams.html">Teams</a>
+      <a href="players.html">Players</a>
+      <a href="games.html">Games</a>
+	  <a class="active" href="charts.html">Charts</a>
+    </nav>
+
+    <div class="header-right">
+      <label class="season-picker">
+        <span>Season</span>
+        <select id="seasonSelect"></select>
+      </label>
+    </div>
+  </header>
+
+  <main class="page">
+    <h1>Charts</h1>
+
+    <section class="controls charts-controls">
+      <label>
+        Mode
+        <select id="modeSelect">
+          <option value="SKATER">Skaters</option>
+          <option value="GOALIE">Goalies</option>
+          <option value="TEAM">Teams</option>
+        </select>
+      </label>
+
+      <label>
+        Stage
+        <select id="stageSelect">
+          <option value="REG">Regular Season</option>
+          <option value="PO">Playoffs</option>
+        </select>
+      </label>
+
+      <label>
+        X Axis
+        <select id="xSelect"></select>
+      </label>
+
+      <label>
+        Y Axis
+        <select id="ySelect"></select>
+      </label>
+
+      <label>
+        Color By
+        <select id="colorSelect"></select>
+      </label>
+
+      <label class="min-gp">
+        Min GP
+        <input id="minGpInput" type="number" min="0" step="1" value="1" />
+      </label>
+
+      <label class="trendline">
+        <input id="trendlineToggle" type="checkbox" />
+        Trendline
+      </label>
+    </section>
+
+    <div id="status" class="status">Loading…</div>
+
+    <section class="charts-wrap" aria-label="Interactive chart">
+      <div id="chart"></div>
+    </section>
+
+    <p class="charts-footnote">
+      Tip: drag to zoom, double-click to reset.
+    </p>
+  </main>
+
+  <!-- Plotly (CDN) -->
+  <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+
+  <!-- Page logic -->
+  <script type="module" src="../js/charts.js"></script>
+</body>
+</html>
