@@ -1,6 +1,6 @@
 // js/team.js
 import { loadCSV, toIntMaybe, toNumMaybe } from "./data.js";
-import { initSeasonPicker, getSeasonId, onSeasonChange } from "./season.js";
+import { initSeasonPicker, getSeasonId, onSeasonChange, saveStage, playoffsHaveBegun, applyDefaultStage } from "./season.js";
 
 const elSeason = document.getElementById("seasonSelect");
 const elStatus = document.getElementById("status");
@@ -24,7 +24,10 @@ boot();
 async function boot() {
   await initSeasonPicker(elSeason);
   onSeasonChange(() => refresh());
-  elStage.addEventListener("change", () => refresh());
+elStage.addEventListener("change", () => {
+  saveStage(elStage.value, getSeasonId());
+  refresh();
+});
   await refresh();
 }
 
@@ -70,25 +73,33 @@ async function refresh() {
 	// Detect if playoffs file exists for this season; disable option if not.
 	const hasPlayoffs = await urlExists(playoffPlayersPath);
 	setPlayoffsOptionEnabled(hasPlayoffs);
+	
+	const seasonsPath = `../data/seasons.csv`;
+const gamesPath   = `../data/${seasonId}/games.csv`;
+const schedPath   = `../data/${seasonId}/schedule.csv`;
 
-	// Decide which players file to load
-	const stage = elStage.value; // "REG" | "PO"
-	const playersPath = (stage === "PO" && hasPlayoffs)
-	? playoffPlayersPath
-	: regularPlayersPath;
-
-    const gamesPath = `../data/${seasonId}/games.csv`;
-    const schedPath = `../data/${seasonId}/schedule.csv`;
-
-const seasonsPath = `../data/seasons.csv`;
-
-const [seasons, teams, players, games, schedule] = await Promise.all([
+	// Load core first (need schedule+games to auto-default stage)
+const [seasons, teams, games, schedule] = await Promise.all([
   loadCSV(seasonsPath),
   loadCSV(teamsPath),
-  loadCSV(playersPath),
   loadCSV(gamesPath),
   loadCSV(schedPath),
 ]);
+
+const playoffsBegun = playoffsHaveBegun(schedule, games);
+applyDefaultStage(elStage, seasonId, {
+  playoffsEnabled: hasPlayoffs,
+  playoffsBegun
+});
+
+// Now decide which players file to load
+const stage = elStage.value;
+const playersPath = (stage === "PO" && hasPlayoffs)
+  ? playoffPlayersPath
+  : regularPlayersPath;
+
+// Load players AFTER stage is finalized
+const players = await loadCSV(playersPath);
 
 const seasonRow = seasons.find(s => String(s.season_id).trim() === seasonId);
 const advOn = (toIntMaybe(seasonRow?.adv_stats) ?? 0) === 1;

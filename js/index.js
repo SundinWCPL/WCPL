@@ -1,6 +1,6 @@
 // js/index.js
 import { loadCSV, toIntMaybe, toNumMaybe } from "./data.js";
-import { initSeasonPicker, getSeasonId, onSeasonChange } from "./season.js";
+import { initSeasonPicker, getSeasonId, onSeasonChange, saveStage, playoffsHaveBegun, applyDefaultStage } from "./season.js";
 
 const elSeason = document.getElementById("seasonSelect");
 const elStatus = document.getElementById("status");
@@ -33,7 +33,10 @@ boot();
 async function boot() {
   await initSeasonPicker(elSeason);
   onSeasonChange(() => refresh());
-  elStage?.addEventListener("change", () => refresh());
+  elStage?.addEventListener("change", () => {
+  saveStage(elStage.value, getSeasonId());
+  refresh();
+});
   wireScheduleButtons();
   await refresh();
 }
@@ -96,17 +99,35 @@ const seasonsPath = `${base}/seasons.csv`;
 const hasPlayoffsPlayers = await urlExists(playoffPlayersPath);
 setPlayoffsOptionEnabled(hasPlayoffsPlayers);
 
-const stageMode = (elStage?.value === "PO" && hasPlayoffsPlayers) ? "PO" : "REG";
-
-const playersPath = (stageMode === "PO") ? playoffPlayersPath : regularPlayersPath;
-
-const [seasons, tRows, pRows, gRows, sRows] = await Promise.all([
+// Load the "always needed" CSVs first (teams, games, schedule, seasons)
+const [seasons, tRows, gRows, sRows] = await Promise.all([
   loadCSV(seasonsPath),
   loadCSV(teamsPath),
-  loadCSV(playersPath),
   loadCSV(gamesPath),
   loadCSV(schedPath),
 ]);
+
+// Now we can detect whether playoffs have begun
+const playoffsBegun = playoffsHaveBegun(sRows, gRows);
+
+// Apply default stage (respects saved stage if any)
+applyDefaultStage(elStage, seasonId, {
+  playoffsEnabled: hasPlayoffsPlayers,
+  playoffsBegun
+});
+
+// Decide stage + load the correct players file
+const stageMode = (elStage?.value === "PO" && hasPlayoffsPlayers) ? "PO" : "REG";
+const playersPath = (stageMode === "PO") ? playoffPlayersPath : regularPlayersPath;
+
+// Load players AFTER stageMode is finalized
+const pRows = await loadCSV(playersPath);
+
+// Assign globals
+teams = tRows;
+players = pRows;
+games = gRows;
+schedule = sRows;
 
 teams = tRows;
 players = pRows;

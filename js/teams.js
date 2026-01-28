@@ -1,6 +1,6 @@
 // js/teams.js
 import { loadCSV, toIntMaybe } from "./data.js";
-import { initSeasonPicker, getSeasonId, onSeasonChange } from "./season.js";
+import { initSeasonPicker, getSeasonId, onSeasonChange, saveStage, playoffsHaveBegun, applyDefaultStage } from "./season.js";
 
 const elSeason = document.getElementById("seasonSelect");
 const elStatus = document.getElementById("status");
@@ -53,7 +53,10 @@ async function boot() {
 
 function wireFilters() {
   elConf.addEventListener("change", render);
-  elStage.addEventListener("change", () => refresh());
+  elStage.addEventListener("change", () => {
+  saveStage(elStage.value, getSeasonId());
+  refresh();
+});
   elTable.querySelector("thead").addEventListener("click", (e) => {
   const th = e.target.closest("th");
   if (!th) return;
@@ -98,7 +101,11 @@ if (elPointsNote) {
     const games = await loadCSV(gamesPath);
     const schedule = await loadCSV(schedPath);
 	setPlayoffsOptionEnabled(hasAnyPlayoffs(schedule));
-
+const playoffsBegun = playoffsHaveBegun(schedule, games);
+applyDefaultStage(elStage, seasonId, {
+  playoffsEnabled: hasAnyPlayoffs(schedule),
+  playoffsBegun
+});
     buildConferenceOptions(teams);
     standings = computeStandings(teams, games, schedule, seasonId, elStage.value);
 	

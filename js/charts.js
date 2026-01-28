@@ -1,6 +1,6 @@
 // js/charts.js
 import { loadCSV, toNumMaybe, toIntMaybe, truthy01 } from "./data.js";
-import { initSeasonPicker, getSeasonId, onSeasonChange, withSeason } from "./season.js";
+import { initSeasonPicker, getSeasonId, onSeasonChange, withSeason, saveStage, playoffsHaveBegun, applyDefaultStage } from "./season.js";
 
 /* ---------------------------
    DOM
@@ -899,10 +899,18 @@ async function refresh(){
 
   setStatus("Loading…");
 
-  const advOn = seasonAdvEnabled(seasonId);
-  const stageSel = elStage.value;
+const advOn = seasonAdvEnabled(seasonId);
 
-  const data = await getSeasonData(seasonId);
+const data = await getSeasonData(seasonId);
+
+// Auto-default Stage based on "playoffs begun" (only if playoff players exist)
+const playoffsEnabled = Array.isArray(data.playersPO) && data.playersPO.length > 0;
+const playoffsBegun = playoffsHaveBegun(data.schedule, data.games);
+
+applyDefaultStage(elStage, seasonId, { playoffsEnabled, playoffsBegun });
+
+// NOW read stage (after it may have been auto-set)
+const stageSel = elStage.value;
 
   if (!data.teams.length){
     setStatus(`No data exists for Season ${seasonId}.`);
@@ -910,7 +918,7 @@ async function refresh(){
     return;
   }
 
-  const ctxBase = buildContext(seasonId, data, stageSel, advOn);
+  const ctxBase = buildContext(seasonId, data, stageSel, advOn); // base context
   const mode = elMode.value;
   const ctx = { ...ctxBase, mode };
 
@@ -1068,7 +1076,10 @@ async function boot(){
     await initSeasonPicker(elSeason);
 
     elMode.addEventListener("change", refresh);
-    elStage.addEventListener("change", refresh);
+    elStage.addEventListener("change", () => {
+  saveStage(elStage.value, getSeasonId());
+  refresh();
+});
     elX.addEventListener("change", refresh);
     elY.addEventListener("change", refresh);
     elColor.addEventListener("change", refresh);

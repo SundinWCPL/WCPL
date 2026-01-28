@@ -1,6 +1,6 @@
 // js/games.js
 import { loadCSV, toIntMaybe } from "./data.js";
-import { initSeasonPicker, getSeasonId, onSeasonChange } from "./season.js";
+import { initSeasonPicker, getSeasonId, onSeasonChange, saveStage, playoffsHaveBegun, applyDefaultStage } from "./season.js";
 
 const elSeason = document.getElementById("seasonSelect");
 const elStatus = document.getElementById("status");
@@ -24,7 +24,11 @@ boot();
 async function boot() {
   await initSeasonPicker(elSeason);
   onSeasonChange(() => refresh());
-  elStage.addEventListener("change", renderSeries);
+  elStage.addEventListener("change", () => {
+    // games page uses "reg"/"po", but we store "REG"/"PO"
+    saveStage((elStage.value === "po") ? "PO" : "REG", getSeasonId());
+    renderSeries();
+  });
   elGameStatus.addEventListener("change", renderSeries);
 // Click-to-sort on headers (Players-style)
 elThead.addEventListener("click", (e) => {
@@ -66,6 +70,12 @@ async function refresh() {
     } catch {
       gamesRows = [];
     }
+
+    // Auto-default stage (per-season) once playoffs have begun
+    const playoffsBegun = playoffsHaveBegun(scheduleRows, gamesRows);
+    const tmpStage = { value: "REG" };
+    applyDefaultStage(tmpStage, seasonId, { playoffsEnabled: true, playoffsBegun });
+    elStage.value = (tmpStage.value === "PO") ? "po" : "reg";
 
     setLoading(false);
     renderSeries();

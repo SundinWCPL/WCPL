@@ -1,5 +1,5 @@
 import { loadCSV, toIntMaybe, toNumMaybe } from "./data.js";
-import { initSeasonPicker, getSeasonId, onSeasonChange } from "./season.js";
+import { initSeasonPicker, getSeasonId, onSeasonChange, saveStage, playoffsHaveBegun, applyDefaultStage } from "./season.js";
 
 const elSeason = document.getElementById("seasonSelect");
 const elStatus = document.getElementById("status");
@@ -40,7 +40,10 @@ function wireFilters() {
     setDefaultSortForMode(elPos.value);
     render();
   });
-  elStage.addEventListener("change", () => refresh());
+elStage.addEventListener("change", () => {
+  saveStage(elStage.value, getSeasonId());
+  refresh();
+});
   elTeam.addEventListener("change", render);
   elConf.addEventListener("change", render);
   elMinGP.addEventListener("input", render);
@@ -89,6 +92,7 @@ function setPlayoffsOptionEnabled(enabled) {
 
 async function refresh() {
   const seasonId = getSeasonId();
+  const schedPath = `../data/${seasonId}/schedule.csv`;
   if (!seasonId) {
     setLoading(true, "No season found in seasons.csv.");
     return;
@@ -120,6 +124,12 @@ async function refresh() {
     // Detect if playoffs CSV exists for this season; disable option if not.
     const hasPlayoffs = await urlExists(playoffPlayersPath);
     setPlayoffsOptionEnabled(hasPlayoffs);
+const schedule = await loadCSV(schedPath).catch(() => []);
+const playoffsBegun = playoffsHaveBegun(schedule);
+applyDefaultStage(elStage, seasonId, {
+  playoffsEnabled: hasPlayoffs,
+  playoffsBegun
+});
 
     // Decide which players file to load
     const stage = elStage.value; // "REG" | "PO"

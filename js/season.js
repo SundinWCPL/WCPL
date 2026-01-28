@@ -97,3 +97,70 @@ function getSavedSeason() {
 function saveSeason(seasonId) {
   try { localStorage.setItem(LS_KEY, seasonId); } catch {}
 }
+// --- Stage (REG/PO) helpers ---------------------------------------------
+
+const LS_STAGE_KEY_PREFIX = "wcpl_stage_"; // per-season
+
+export function getSavedStage(seasonId = currentSeasonId) {
+  if (!seasonId) return null;
+  try { return localStorage.getItem(LS_STAGE_KEY_PREFIX + seasonId); } catch { return null; }
+}
+
+export function saveStage(stage, seasonId = currentSeasonId) {
+  if (!seasonId) return;
+  try { localStorage.setItem(LS_STAGE_KEY_PREFIX + seasonId, stage); } catch {}
+}
+
+// "Playoffs have begun" if any qf/sf/f game is marked played in schedule.csv.
+// Optionally, pass gamesRows to fallback-detect by goals.
+export function playoffsHaveBegun(scheduleRows = [], gamesRows = null) {
+  const isPOStage = (st) => {
+    const s = String(st ?? "").trim().toLowerCase();
+    return s === "qf" || s === "sf" || s === "f";
+  };
+
+  // Primary: schedule status
+  for (const r of scheduleRows) {
+    if (!isPOStage(r.stage)) continue;
+    const status = String(r.status ?? "").trim().toLowerCase();
+    if (status === "played") return true;
+  }
+
+  // Optional fallback: if games provided, detect scores for playoff match_ids
+  if (Array.isArray(gamesRows) && gamesRows.length) {
+    const poIds = new Set(
+      scheduleRows
+        .filter(r => isPOStage(r.stage))
+        .map(r => String(r.match_id ?? "").trim())
+        .filter(Boolean)
+    );
+
+    for (const g of gamesRows) {
+      const mid = String(g.match_id ?? "").trim();
+      if (!poIds.has(mid)) continue;
+      // "played" if goals exist (string non-blank)
+      const hg = String(g.home_goals ?? "").trim();
+      const ag = String(g.away_goals ?? "").trim();
+      if (hg !== "" && ag !== "") return true;
+    }
+  }
+
+  return false;
+}
+
+// Apply default stage on a page, respecting saved user choice.
+// - playoffsEnabled: whether PO option is actually available (players_playoffs exists, etc)
+export function applyDefaultStage(elStage, seasonId, { playoffsEnabled, playoffsBegun }) {
+  if (!elStage) return;
+
+  const saved = getSavedStage(seasonId);
+
+  // If saved exists, honor it (unless PO is not enabled)
+  if (saved === "PO" || saved === "REG") {
+    elStage.value = (saved === "PO" && playoffsEnabled) ? "PO" : "REG";
+    return;
+  }
+
+  // No saved choice: auto-default
+  elStage.value = (playoffsEnabled && playoffsBegun) ? "PO" : "REG";
+}

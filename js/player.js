@@ -1,5 +1,5 @@
 import { loadCSV, toIntMaybe, toNumMaybe } from "./data.js";
-import { initSeasonPicker, getSeasonId, onSeasonChange } from "./season.js";
+import { initSeasonPicker, getSeasonId, onSeasonChange, saveStage, playoffsHaveBegun, applyDefaultStage } from "./season.js";
 
 const elSeason = document.getElementById("seasonSelect");
 const elStatus = document.getElementById("status");
@@ -26,7 +26,10 @@ boot();
 async function boot() {
   await initSeasonPicker(elSeason);
   onSeasonChange(() => refresh());
-  elStage.addEventListener("change", () => refresh());
+elStage.addEventListener("change", () => {
+  saveStage(elStage.value, getSeasonId());
+  refresh();
+});
   await refresh();
 }
 
@@ -72,10 +75,19 @@ async function refresh() {
     // Enable/disable playoffs option (for current season)
     const hasPlayoffsThisSeason = await urlExists(playoffPlayersPath);
     setPlayoffsOptionEnabled(hasPlayoffsThisSeason);
+const schedPath = `../data/${seasonId}/schedule.csv`;
+const schedule = await loadCSV(schedPath).catch(() => []);
 
-    // Pick current-season file based on stage selection
-    const stage = elStage.value; // "REG" | "PO"
-    const playersPath = (stage === "PO" && hasPlayoffsThisSeason) ? playoffPlayersPath : regularPlayersPath;
+const playoffsBegun = playoffsHaveBegun(schedule);
+applyDefaultStage(elStage, seasonId, {
+  playoffsEnabled: hasPlayoffsThisSeason,
+  playoffsBegun
+});
+
+const stage = elStage.value; // "REG" | "PO"
+const playersPath = (stage === "PO" && hasPlayoffsThisSeason)
+  ? playoffPlayersPath
+  : regularPlayersPath;
 
     // Load current season core data
     const [seasons, teams, players] = await Promise.all([
