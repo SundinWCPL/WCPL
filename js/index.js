@@ -220,7 +220,7 @@ function renderSchedule(seasonId) {
       const ag = g ? toIntMaybe(g.away_goals) : null;
       const ot = g ? (toIntMaybe(g.ot) ?? 0) : 0;
 
-      const played = status === "played" && hg !== null && ag !== null;
+      const played = (hg !== null && ag !== null);
 
       // Sort: reg by week then match number; playoffs after reg, then stage order qf->sf->f
       const stageOrder = stage === "reg" ? 0 : (stage === "qf" ? 1 : (stage === "sf" ? 2 : 3));
@@ -931,25 +931,34 @@ function renderLeaders(seasonId) {
   }
   elSkaters.hidden = false;
 
-  /* ---------------- GOALIES ---------------- */
-  const goalieRows = players
-    .map(p => {
-      const gp = toIntMaybe(p.gp_g) ?? 0;
-      const ga = toIntMaybe(p.ga) ?? 0;
+/* ---------------- GOALIES ---------------- */
+const goalieRows = players
+  .map(p => {
+    const gp = toIntMaybe(p.gp_g) ?? 0;
+    const ga = toIntMaybe(p.ga) ?? 0;
+    const toi = toNumMaybe(p.toi_g);      // seconds
+    const gaaCsv = toNumMaybe(p.gaa);     // already per-15 in your players.csv
 
-      return {
-        player_key: String(p.player_key ?? "").trim(),
-        name: String(p.name ?? "").trim(),
-        team_id: String(p.team_id ?? "").trim(),
-        gp,
-        svp: toNumMaybe(p.sv_pct), // 0–1
-        gaa: gp > 0 ? (ga / gp) : null,
-        sa: toIntMaybe(p.sa),
-        so: toIntMaybe(p.so),
-        team: teamById.get(String(p.team_id ?? "").trim()),
-      };
-    })
-    .filter(r => r.gp > 0 && r.svp !== null);
+    const gaa =
+      gaaCsv !== null ? gaaCsv
+      : (toi !== null && toi > 0) ? (ga * 900 / toi)   // 900s = 15min
+      : (gp > 0) ? (ga / gp)                           // last-resort fallback
+      : null;
+
+    return {
+      player_key: String(p.player_key ?? "").trim(),
+      name: String(p.name ?? "").trim(),
+      team_id: String(p.team_id ?? "").trim(),
+      gp,
+      svp: toNumMaybe(p.sv_pct), // 0–1
+      gaa,
+      sa: toIntMaybe(p.sa),
+      so: toIntMaybe(p.so),
+      team: teamById.get(String(p.team_id ?? "").trim()),
+    };
+  })
+  .filter(r => r.gp > 0 && r.svp !== null);
+
 
   const { pool: gPool, minGP: gMinGP } = poolWithAdaptiveMin(
     goalieRows,

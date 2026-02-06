@@ -102,6 +102,7 @@ function suggestMinGP(mode, stageSel, data){
   const minPointsWanted = (mode === "SKATER") ? 12 : 6; // tweak to taste
 
   const players = (stageSel === "PO") ? data.playersPO : data.playersReg;
+
   const gpField = (mode === "SKATER") ? "gp_s" : "gp_g";
 
   const gps = players.map(r => toIntMaybe(r[gpField]) ?? 0);
@@ -160,33 +161,34 @@ const STATS = [
   { id:"shots", label:"Shots", scope:"SKATER", format:"number", invert:false, advOnly:false, needsBoxscores:false,
     get:(r)=>toNumMaybe(r.shots) },
 
-  { id:"passes", label:"Passes*", scope:"SKATER", format:"number", invert:false, advOnly:true, needsBoxscores:false,
+  { id:"passes", label:"Passes", scope:"SKATER", format:"number", invert:false, advOnly:true, needsBoxscores:false,
     get:(r)=>toNumMaybe(r.passes) },
 
-  { id:"exits", label:"Exits*", scope:"SKATER", format:"number", invert:false, advOnly:true, needsBoxscores:false,
+  { id:"exits", label:"Exits", scope:"SKATER", format:"number", invert:false, advOnly:true, needsBoxscores:false,
     get:(r)=>toNumMaybe(r.exits) },
 
-  { id:"entries", label:"Entries*", scope:"SKATER", format:"number", invert:false, advOnly:true, needsBoxscores:false,
+  { id:"entries", label:"Entries", scope:"SKATER", format:"number", invert:false, advOnly:true, needsBoxscores:false,
     get:(r)=>toNumMaybe(r.entries) },
 
-  { id:"turnovers", label:"Turnovers*", scope:"SKATER", format:"number", invert:true, advOnly:true, needsBoxscores:false,
+  { id:"turnovers", label:"Turnovers", scope:"SKATER", format:"number", invert:true, advOnly:true, needsBoxscores:false,
     get:(r)=>toNumMaybe(r.turnovers) },
 
-  { id:"takeaways", label:"Takeaways*", scope:"SKATER", format:"number", invert:false, advOnly:true, needsBoxscores:false,
+  { id:"takeaways", label:"Takeaways", scope:"SKATER", format:"number", invert:false, advOnly:true, needsBoxscores:false,
     get:(r)=>toNumMaybe(r.takeaways) },
 
-  { id:"possession_s", label:"Possession (s)*", scope:"SKATER", format:"number", invert:false, advOnly:true, needsBoxscores:false,
+  { id:"possession_s", label:"Possession (s)", scope:"SKATER", format:"number", invert:false, advOnly:true, needsBoxscores:false,
     get:(r)=>toNumMaybe(r.possession_s) },
 	
 	{ id:"sp_s", label:"SP", scope:"SKATER", format:"number", invert:false, advOnly:false, needsBoxscores:false,
   get:(r)=>toNumMaybe(r.sp) },
 
 { id:"sp_per_gp_s", label:"SP/GP", scope:"SKATER", format:"number", invert:false, advOnly:false, needsBoxscores:false,
-  get:(r)=>{
-    const sp = toNumMaybe(r.sp);
-    const gp = toNumMaybe(r.gp_s);
-    return safeDiv(sp, gp);
-  } },
+  get:(r, ctx)=>{
+    const v = toNumMaybe(r.sp_per_gp);
+    if (v != null) return v;
+    return perGpNormalized(r.sp, r, "SKATER", ctx.advOn);
+  }
+},
 
 
   // Shooting % (rename to Sh%)
@@ -199,59 +201,76 @@ const STATS = [
   },
 
   // Rates (/GP fallback, /15 is separate)
-  { id:"g_rate", label:"G/GP", scope:"SKATER", format:"number", invert:false, advOnly:false, needsBoxscores:false,
-    get:(r)=>{
-      const g = toNumMaybe(r.g);
-      const gp = toNumMaybe(r.gp_s);
-      return safeDiv(g, gp);
-    }
-  },
-  { id:"p_rate", label:"P/GP", scope:"SKATER", format:"number", invert:false, advOnly:false, needsBoxscores:false,
-    get:(r)=>{
-      const p = toNumMaybe(r.pts);
-      const gp = toNumMaybe(r.gp_s);
-      return safeDiv(p, gp);
-    }
-  },
+{ id:"g_rate", label:"G/GP", scope:"SKATER", format:"number", invert:false, advOnly:false, needsBoxscores:false,
+  get:(r, ctx)=>{
+    return perGpNormalized(r.g, r, "SKATER", ctx.advOn);
+  }
+},
+{ id:"p_rate", label:"P/GP", scope:"SKATER", format:"number", invert:false, advOnly:false, needsBoxscores:false,
+  get:(r, ctx)=>{
+    const v = toNumMaybe(r.p_per_gp); // prefer CSV if present
+    if (v != null) return v;
+    return perGpNormalized(r.pts, r, "SKATER", ctx.advOn);
+  }
+},
 
-  { id:"g_per_15", label:"G/15*", scope:"SKATER", format:"number", invert:false, advOnly:true, needsBoxscores:true,
-    get:(r, ctx)=>{
-      const key = playerKey(r);
-      const g = toNumMaybe(r.g);
-      const toi = ctx.toiByPlayer.get(key) ?? null;
-      if (toi === null) return null;
-      return safeDiv(g, (toi / 900)); // 900s = 15 min
-    }
-  },
-  { id:"p_per_15", label:"P/15*", scope:"SKATER", format:"number", invert:false, advOnly:true, needsBoxscores:true,
-    get:(r, ctx)=>{
-      const key = playerKey(r);
-      const p = toNumMaybe(r.pts);
-      const toi = ctx.toiByPlayer.get(key) ?? null;
-      if (toi === null) return null;
-      return safeDiv(p, (toi / 900));
-    }
-  },
+{ id:"g_per_15", label:"G/15", scope:"SKATER", format:"number", invert:false, advOnly:true, needsBoxscores:false,
+  get:(r, ctx)=>{
+    const g = toNumMaybe(r.g);
+    if (g === null) return null;
+
+    // Prefer players.csv TOI, then boxscores-derived TOI, else GP fallback (S1)
+    const toi =
+      toNumMaybe(r.toi_s) ??
+      (ctx.toiByPlayer.get(playerKey(r)) ?? null) ??
+      null;
+
+    if (toi !== null && toi > 0) return g * 900 / toi;
+
+    const gp = toNumMaybe(r.gp_s) ?? 0;
+    return gp > 0 ? (g / gp) : null;
+  }
+},
+
+{ id:"p_per_15", label:"P/15", scope:"SKATER", format:"number", invert:false, advOnly:true, needsBoxscores:false,
+  get:(r, ctx)=>{
+    const p = toNumMaybe(r.pts);
+    if (p === null) return null;
+
+    const toi =
+      toNumMaybe(r.toi_s) ??
+      (ctx.toiByPlayer.get(playerKey(r)) ?? null) ??
+      null;
+
+    if (toi !== null && toi > 0) return p * 900 / toi;
+
+    const gp = toNumMaybe(r.gp_s) ?? 0;
+    return gp > 0 ? (p / gp) : null;
+  }
+},
 
   // Possession%* = poss_s / toi_s (from boxscores)
-  { id:"poss_pct", label:"Possession%*", scope:"SKATER", format:"percent", invert:false, advOnly:true, needsBoxscores:true,
-    get:(r, ctx)=>{
-      const key = playerKey(r);
-      const poss = ctx.possByPlayer.get(key) ?? null;
-      const toi  = ctx.toiByPlayer.get(key) ?? null;
-      return safeDiv(poss, toi);
-    }
-  },
+{ id:"poss_pct", label:"Possession%", scope:"SKATER", format:"percent", invert:false, advOnly:true, needsBoxscores:false,
+  get:(r, ctx)=>{
+    const key = playerKey(r);
+
+    // Prefer players.csv aggregates, else boxscores-derived maps
+    const poss = toNumMaybe(r.possession_s) ?? (ctx.possByPlayer.get(key) ?? null);
+    const toi  = toNumMaybe(r.toi_s)        ?? (ctx.toiByPlayer.get(key) ?? null);
+
+    return safeDiv(poss, toi);
+  }
+},
 
   // GF%* (WCPL definition): team goal share in games player appeared in
-  { id:"gf_pct", label:"GF%*", scope:"SKATER", format:"percent", invert:false, advOnly:true, needsBoxscores:true,
-    get:(r, ctx)=>{
-      const key = playerKey(r);
-      const gf = ctx.gfByPlayer.get(key) ?? null;
-      const ga = ctx.gaByPlayer.get(key) ?? null;
-      return safeDiv(gf, (gf === null || ga === null) ? null : (gf + ga));
-    }
-  },
+{ id:"gf_pct", label:"GF%", scope:"SKATER", format:"percent", invert:false, advOnly:true, needsBoxscores:false,
+  get:(r, ctx)=>{
+    const key = playerKey(r);
+    const gf = ctx.gfByPlayer.get(key) ?? null;
+    const ga = ctx.gaByPlayer.get(key) ?? null;
+    return safeDiv(gf, (gf === null || ga === null) ? null : (gf + ga));
+  }
+},
 
   /* ===== GOALIES ===== */
   { id:"gp_g", label:"GP", scope:"GOALIE", format:"number", invert:false, advOnly:false, needsBoxscores:false,
@@ -287,18 +306,18 @@ const STATS = [
   { id:"gaa", label:"GAA", scope:"GOALIE", format:"number", invert:true, advOnly:false, needsBoxscores:false,
     get:(r)=>toNumMaybe(r.gaa) },
 
-  { id:"sp_per_gp", label:"SP/GP", scope:"GOALIE", format:"number", invert:false, advOnly:false, needsBoxscores:false,
-    get:(r)=>{
-      const sp = toNumMaybe(r.sp);
-      const gp = toNumMaybe(r.gp_g);
-      return safeDiv(sp, gp);
-    }
-  },
+{ id:"sp_per_gp", label:"SP/GP", scope:"GOALIE", format:"number", invert:false, advOnly:false, needsBoxscores:false,
+  get:(r, ctx)=>{
+    const v = toNumMaybe(r.sp_per_gp);
+    if (v != null) return v;
+    return perGpNormalized(r.sp, r, "GOALIE", ctx.advOn);
+  }
+},
 
-  { id:"body_sv", label:"Body SV*", scope:"GOALIE", format:"number", invert:false, advOnly:true, needsBoxscores:false,
+  { id:"body_sv", label:"Body SV", scope:"GOALIE", format:"number", invert:false, advOnly:true, needsBoxscores:false,
     get:(r)=>toNumMaybe(r.body_sv) },
 
-  { id:"stick_sv", label:"Stick SV*", scope:"GOALIE", format:"number", invert:false, advOnly:true, needsBoxscores:false,
+  { id:"stick_sv", label:"Stick SV", scope:"GOALIE", format:"number", invert:false, advOnly:true, needsBoxscores:false,
     get:(r)=>toNumMaybe(r.stick_sv) },
 
   /* ===== TEAMS ===== */
@@ -331,13 +350,13 @@ const STATS = [
     return safeDiv(a.sf, a.sa);
   }
 },
-  { id:"poss_for", label:"Possession For*", scope:"TEAM", format:"number", invert:false, advOnly:true, needsBoxscores:false,
+  { id:"poss_for", label:"Possession For", scope:"TEAM", format:"number", invert:false, advOnly:true, needsBoxscores:false,
     get:(t, ctx)=> ctx.teamAgg.get(t.team_id)?.possFor ?? null
   },
-  { id:"poss_against", label:"Possession Against*", scope:"TEAM", format:"number", invert:true, advOnly:true, needsBoxscores:false,
+  { id:"poss_against", label:"Possession Against", scope:"TEAM", format:"number", invert:true, advOnly:true, needsBoxscores:false,
     get:(t, ctx)=> ctx.teamAgg.get(t.team_id)?.possAgainst ?? null
   },
-  { id:"poss_share_team", label:"Possession%*", scope:"TEAM", format:"percent", invert:false, advOnly:true, needsBoxscores:false,
+  { id:"poss_share_team", label:"Possession%", scope:"TEAM", format:"percent", invert:false, advOnly:true, needsBoxscores:false,
     get:(t, ctx)=>{
       const a = ctx.teamAgg.get(t.team_id);
       if (!a) return null;
@@ -630,7 +649,7 @@ if (ovStage) {
 /* ---------------------------
    Boxscores-derived maps
 --------------------------- */
-function buildBoxscoreMaps(boxscores, gamesById, scheduleById, stageSel){
+function buildBoxscoreMaps(boxscores, gamesById, scheduleById, stageSel, steamToPlayerKey, nameToPlayerKey){
   const maps = {
     hasBox: false,
     toiByPlayer: new Map(),
@@ -652,12 +671,29 @@ function buildBoxscoreMaps(boxscores, gamesById, scheduleById, stageSel){
     return (wantPO && po) || (!wantPO && !po);
   }
 
-  for (const r of boxscores){
-    const matchId = r.match_id;
-    if (!matchAllowed(matchId)) continue;
+for (const r of boxscores){
+  const matchId = r.match_id;
+  if (!matchAllowed(matchId)) continue;
 
-    const key = playerKey(r);
-    if (!key) continue;
+  // --- Normalize boxscores identity to match players.csv ---
+  // Prefer player_key if present, else steam_id, else name.
+  // (boxscores commonly uses player_name instead of name)
+if ((!r.name || !String(r.name).trim()) && r.player_name) {
+  r.name = String(r.player_name).trim();
+}
+
+let key = (r.player_key || "").toString().trim();
+
+if (!key && r.steam_id && steamToPlayerKey) {
+  key = steamToPlayerKey.get(String(r.steam_id).trim()) || "";
+}
+if (!key && r.name && nameToPlayerKey) {
+  key = nameToPlayerKey.get(String(r.name).trim().toLowerCase()) || "";
+}
+if (!key) key = playerKey(r); // final fallback
+if (!key) continue;
+  // --- end normalize ---
+
 
     const toi = toIntMaybe(r.toi_s);
     const poss = toIntMaybe(r.poss_s);
@@ -722,8 +758,29 @@ function buildContext(seasonId, data, stageSel, advOn){
   for (const t of data.teams) teamsById.set(t.team_id, t);
 
   const teamAgg = buildTeamAgg(data.teams, data.schedule, data.games, seasonId, stageSel);
+  
+  const steamToPlayerKey = new Map();
+const nameToPlayerKey = new Map();
 
-  const boxMaps = buildBoxscoreMaps(data.boxscores, gamesById, scheduleById, stageSel);
+for (const p of data.playersReg || []) {
+  const pk = (p.player_key || "").toString().trim();
+  if (!pk) continue;
+  const sid = (p.steam_id || "").toString().trim();
+  const nm = (p.name || "").toString().trim().toLowerCase();
+  if (sid) steamToPlayerKey.set(sid, pk);
+  if (nm) nameToPlayerKey.set(nm, pk);
+}
+for (const p of data.playersPO || []) {
+  const pk = (p.player_key || "").toString().trim();
+  if (!pk) continue;
+  const sid = (p.steam_id || "").toString().trim();
+  const nm = (p.name || "").toString().trim().toLowerCase();
+  if (sid) steamToPlayerKey.set(sid, pk);
+  if (nm) nameToPlayerKey.set(nm, pk);
+}
+
+
+  const boxMaps = buildBoxscoreMaps(data.boxscores, gamesById, scheduleById, stageSel, steamToPlayerKey, nameToPlayerKey);
 
   const useToiRates = advOn && boxMaps.hasBox;
 
@@ -927,10 +984,20 @@ const prevX = elX.value;
 const prevY = elY.value;
 const prevC = elColor.value;
 
+const stagePlayers = (stageSel === "PO") ? data.playersPO : data.playersReg;
+
+const hasToiPlayers =
+  (mode === "SKATER") ? stagePlayers.some(r => (toNumMaybe(r.toi_s) ?? 0) > 0) :
+  (mode === "GOALIE") ? stagePlayers.some(r => (toNumMaybe(r.toi_g) ?? 0) > 0) :
+  false;
+
+// hasToi means "treat TOI-based stats as available"
+const hasToi = advOn && (ctx.hasBox || hasToiPlayers);
+
 // Dropdowns depend on mode + adv + boxscore availability
-buildAxisDropdown(elX, mode, advOn, ctx.hasBox);
-buildAxisDropdown(elY, mode, advOn, ctx.hasBox);
-buildColorDropdown(elColor, mode, advOn, ctx.hasBox);
+buildAxisDropdown(elX, mode, advOn, hasToi);
+buildAxisDropdown(elY, mode, advOn, hasToi);
+buildColorDropdown(elColor, mode, advOn, hasToi);
 
 // Preferred defaults per mode
 const defX =
@@ -1100,4 +1167,27 @@ elMinGP.addEventListener("input", () => {
     setStatus(err?.message || "Failed to load.");
   }
   window.addEventListener("resize", () => Plotly.Plots.resize(elChart));
+}
+function perGpNormalized(total, row, scope, advStatsOn){
+  const x = toNumMaybe(total);
+  if (x == null) return null;
+
+  if (advStatsOn){
+    const toi =
+      scope === "GOALIE"
+        ? toNumMaybe(row.toi_g ?? row.toi)
+        : toNumMaybe(row.toi_s ?? row.toi);
+
+    if (toi && toi > 0){
+      return x * 900 / toi;
+    }
+  }
+
+  // legacy fallback (per appearance)
+  const gp =
+    scope === "GOALIE"
+      ? toNumMaybe(row.gp_g)
+      : toNumMaybe(row.gp_s);
+
+  return gp && gp > 0 ? x / gp : null;
 }

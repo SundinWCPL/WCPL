@@ -123,7 +123,7 @@ export function playoffsHaveBegun(scheduleRows = [], gamesRows = null) {
   for (const r of scheduleRows) {
     if (!isPOStage(r.stage)) continue;
     const status = String(r.status ?? "").trim().toLowerCase();
-    if (status === "played") return true;
+    if (status === "played" || status === "final") return true;
   }
 
   // Optional fallback: if games provided, detect scores for playoff match_ids

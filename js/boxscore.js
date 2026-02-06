@@ -17,6 +17,8 @@ const elAwaySummaryTitle = document.getElementById("awaySummaryTitle");
 const elPreviewRosters = document.getElementById("previewRosters");
 const elPlayedBoxscore = document.getElementById("playedBoxscore");
 
+let playerMaps = { bySteam: null, byName: null };
+
 const T = {
   homeSkaters: byId("homeSkaters"),
   homeGoalies: byId("homeGoalies"),
@@ -136,8 +138,9 @@ if (advOn && !played) {
 
       try { players = await loadCSV(playersPath); }
       catch { players = []; }
+	  playerMaps = buildPlayerMaps(players);
 
-      renderPreviewRosters(seasonId, homeTeam, awayTeam, players);
+      renderPreviewRosters(seasonId, homeTeam, awayTeam, players, advOn);
       show(elPreviewRosters);
 
       setLoading(false);
@@ -147,6 +150,16 @@ if (advOn && !played) {
     // Played game:
     // Full nerd boxscore only if advOn and we have per-player rows for match_id.
     const rowsForMatch = boxscores.filter(r => String(r.match_id ?? "").trim() === matchId);
+	
+// Load players for linking boxscore names
+const playersPath =
+  (stage === "reg")
+    ? `../data/${seasonId}/players.csv`
+    : `../data/${seasonId}/players_playoffs.csv`;
+
+try { players = await loadCSV(playersPath); }
+catch { players = []; }
+playerMaps = buildPlayerMaps(players);
 
     if (advOn && rowsForMatch.length > 0) {
       renderPlayedBoxscore(seasonId, homeTeam, awayTeam, rowsForMatch);
@@ -166,6 +179,7 @@ if (advOn && !played) {
     console.error(err);
     setLoading(true, "Error loading boxscore.");
   }
+
 }
 
 /* ------------------------- rendering ------------------------- */
@@ -349,7 +363,7 @@ function summaryHtml(s) {
   `;
 }
 
-function renderPreviewRosters(seasonId, homeTeam, awayTeam, playersRows) {
+function renderPreviewRosters(seasonId, homeTeam, awayTeam, playersRows, advOn) {
   setText("homeRosterTitle", `${displayTeamName(homeTeam)} — Roster`);
   setText("awayRosterTitle", `${displayTeamName(awayTeam)} — Roster`);
   
@@ -361,11 +375,11 @@ applyTeamCardTheme(document.getElementById("awayRosterTitle")?.closest(".card"),
   const home = playersRows.filter(p => String(p.team_id ?? "").trim() === homeTeam.team_id);
   const away = playersRows.filter(p => String(p.team_id ?? "").trim() === awayTeam.team_id);
 
-  renderPreviewTeamTables(seasonId, homeTeam, home, T.homeSkaters, T.homeGoalies);
-  renderPreviewTeamTables(seasonId, awayTeam, away, T.awaySkaters, T.awayGoalies);
+renderPreviewTeamTables(seasonId, homeTeam, home, T.homeSkaters, T.homeGoalies, advOn);
+renderPreviewTeamTables(seasonId, awayTeam, away, T.awaySkaters, T.awayGoalies, advOn);
 }
 
-function renderPreviewTeamTables(seasonId, team, rows, elSk, elGo) {
+function renderPreviewTeamTables(seasonId, team, rows, elSk, elGo, advOn) {
   // Separate skaters/goalies
   const sk = rows.filter(p => String(p.position ?? "").trim().toUpperCase() !== "G");
   const go = rows.filter(p => String(p.position ?? "").trim().toUpperCase() === "G" || (toIntMaybe(p.gp_g) ?? 0) > 0);
@@ -380,9 +394,13 @@ function renderPreviewTeamTables(seasonId, team, rows, elSk, elGo) {
 
   // Bodies
   fillTable(elSk, sk.map(p => {
-    const gp = toIntMaybe(p.gp_s) ?? 0;
-    const pts = toIntMaybe(p.pts) ?? 0;
-    const ppg = (toNumMaybe(p.p_per_gp) ?? (gp > 0 ? pts / gp : null));
+const gp = toIntMaybe(p.gp_s) ?? 0;
+const pts = toIntMaybe(p.pts) ?? 0;
+
+const ppgCsv = toNumMaybe(p.p_per_gp);
+const ppg = (ppgCsv != null && Number.isFinite(ppgCsv))
+  ? ppgCsv
+  : perGpNormalized(pts, p, "SKATER", advOn);
 
     return [
       playerLinkHtml(seasonId, p),
@@ -669,9 +687,29 @@ function playerLinkHtml(seasonId, p) {
 // For boxscores.csv rows (no player_key). We join by steam_id to players.csv later if needed.
 // For now, we link by name only if we can find player_key in players.csv (future enhancement).
 function playerLinkHtmlFromBox(seasonId, r) {
-  const nm = escapeHtml(String(r.player_name ?? "").trim());
-  return nm || "Unknown";
+  const rawName = String(r.player_name ?? "").trim();
+  if (!rawName) return "Unknown";
+
+  // Support common boxscores.csv steam id column names
+  const steam =
+    String(r.steam_id ?? r.steamid ?? r.steamID ?? r.steam ?? r.steam64 ?? "").trim();
+
+  const p =
+    (steam && playerMaps?.bySteam?.get(steam)) ||
+    playerMaps?.byName?.get(normalizeName(rawName)) ||
+    null;
+
+  if (p?.player_key){
+    const href =
+      `player.html?season=${encodeURIComponent(seasonId)}` +
+      `&player_key=${encodeURIComponent(p.player_key)}`;
+
+    return `<a class="team-link" href="${href}">${escapeHtml(p.name)}</a>`;
+  }
+
+  return escapeHtml(rawName);
 }
+
 
 function valOrBlank(v) {
   const s = (v ?? "").toString().trim();
@@ -767,4 +805,70 @@ function computeSeriesWins({ seriesId, gamesRows, upToGameNum }){
 
   return { winsByTeam, winnerId, winnerWins, loserWins };
 }
+function perGpNormalized(total, row, scope, advStatsOn){
+  const x = toNumMaybe(total);
+  if (x == null) return null;
+
+  if (advStatsOn){
+    const toi =
+      scope === "GOALIE"
+        ? toNumMaybe(row.toi_g ?? row.toi)
+        : toNumMaybe(row.toi_s ?? row.toi);
+
+    if (toi && toi > 0){
+      return x * 900 / toi;
+    }
+  }
+
+  // legacy fallback (per appearance)
+  const gp =
+    scope === "GOALIE"
+      ? toNumMaybe(row.gp_g)
+      : toNumMaybe(row.gp_s);
+
+  return gp && gp > 0 ? x / gp : null;
+}
+function normalizeName(s){
+  return String(s ?? "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "")
+    .trim();
+}
+
+function buildPlayerNameMap(players){
+  const map = new Map();
+
+  for (const p of players){
+    const key = normalizeName(p.name);
+    if (!key) continue;
+
+    // If duplicates ever exist, first one wins (acceptable for now)
+    if (!map.has(key)){
+      map.set(key, p);
+    }
+  }
+  return map;
+}
+function normalizeId(s){
+  return String(s ?? "").trim();
+}
+
+function buildPlayerMaps(players){
+  const bySteam = new Map();
+  const byName  = new Map();
+
+  for (const p of players || []){
+    const keyName = normalizeName(p.name);
+    if (keyName && !byName.has(keyName)) byName.set(keyName, p);
+
+    // Support a few common column names (adjust if your players.csv uses a specific one)
+    const steam =
+      normalizeId(p.steam_id ?? p.steamid ?? p.steamID ?? p.steam ?? p.steam64);
+
+    if (steam && !bySteam.has(steam)) bySteam.set(steam, p);
+  }
+
+  return { bySteam, byName };
+}
+
 

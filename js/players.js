@@ -253,16 +253,19 @@ function render() {
     const shots = Number.isFinite(shotsVal) ? shotsVal : null;
     const shRate = (shots !== null && shots > 0) ? (g / shots) : null; // 0-1
 
-    // P/GP is already in CSV; if blank and GP>0, we can compute from pts/gp_s as fallback
-    const gp_s = toIntMaybe(p.gp_s) ?? 0;
-    const pts = toIntMaybe(p.pts) ?? 0;
-    const ppgCsv = toNumMaybe(p.p_per_gp);
-    const ppg = (ppgCsv != null && Number.isFinite(ppgCsv)) ? ppgCsv : (gp_s > 0 ? pts / gp_s : null);
+const gp_s = toIntMaybe(p.gp_s) ?? 0;
+const pts  = toIntMaybe(p.pts) ?? 0;
 
-    // Star Points (CSV preferred; fallback to sp/gp_s if needed)
-    const sp = toNumMaybe(p.sp);
-    const spgCsv = toNumMaybe(p.sp_per_gp);
-    const spg = (spgCsv != null && Number.isFinite(spgCsv)) ? spgCsv : (gp_s > 0 && sp != null ? sp / gp_s : null);
+const ppgCsv = toNumMaybe(p.p_per_gp);
+const ppg = (ppgCsv != null && Number.isFinite(ppgCsv))
+  ? ppgCsv
+  : perGpNormalized(pts, p, "SKATER", advOn);
+
+const sp = toNumMaybe(p.sp);
+const spgCsv = toNumMaybe(p.sp_per_gp);
+const spg = (spgCsv != null && Number.isFinite(spgCsv))
+  ? spgCsv
+  : perGpNormalized(sp, p, "SKATER", advOn);
 
     // Goalie stats
     const gp_g = toIntMaybe(p.gp_g) ?? 0;
@@ -599,3 +602,27 @@ cols.push(
   elThead.innerHTML = "";
   elThead.appendChild(tr);
 }
+function perGpNormalized(total, row, scope, advStatsOn){
+  const x = toNumMaybe(total);
+  if (x == null) return null;
+
+  if (advStatsOn){
+    const toi =
+      scope === "GOALIE"
+        ? toNumMaybe(row.toi_g ?? row.toi)
+        : toNumMaybe(row.toi_s ?? row.toi);
+
+    if (toi && toi > 0){
+      return x * 900 / toi;
+    }
+  }
+
+  // legacy fallback (per appearance)
+  const gp =
+    scope === "GOALIE"
+      ? toNumMaybe(row.gp_g)
+      : toNumMaybe(row.gp_s);
+
+  return gp && gp > 0 ? x / gp : null;
+}
+

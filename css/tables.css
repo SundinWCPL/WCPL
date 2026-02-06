@@ -143,3 +143,28 @@
   color: #e7e7e7;
 }
 
+.clickable-row {
+  cursor: pointer;
+}
+
+.clickable-row:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+/* Game Log numeric columns centered */
+#gameLogTable th.num,
+#gameLogTable td.num {
+  text-align: center;
+}
+/* Tighten and equalize Game Log column padding */
+#gameLogTable th,
+#gameLogTable td {
+  padding-left: 8px;
+  padding-right: 8px;
+  text-align: center;
+}
+
+/* Keep Opponent left-aligned */
+#gameLogTable th:nth-child(2),
+#gameLogTable td:nth-child(2) {
+  text-align: left;
+}

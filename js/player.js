@@ -24,13 +24,17 @@ const gameLogBody = document.querySelector("#gameLogTable tbody");
 boot();
 
 async function boot() {
-  await initSeasonPicker(elSeason);
-  onSeasonChange(() => refresh());
-elStage.addEventListener("change", () => {
-  saveStage(elStage.value, getSeasonId());
-  refresh();
-});
-  await refresh();
+await initSeasonPicker(elSeason);
+onSeasonChange(() => refresh());
+
+if (elStage) {
+  elStage.addEventListener("change", () => {
+    saveStage(elStage.value, getSeasonId());
+    refresh();
+  });
+}
+
+await refresh();
 }
 
 async function urlExists(url) {
@@ -48,6 +52,8 @@ async function urlExists(url) {
 }
 
 function setPlayoffsOptionEnabled(enabled) {
+  if (!elStage) return;
+
   const opt = [...elStage.options].find(o => o.value === "PO");
   if (opt) opt.disabled = !enabled;
   if (!enabled && elStage.value === "PO") elStage.value = "REG";
@@ -78,13 +84,18 @@ async function refresh() {
 const schedPath = `../data/${seasonId}/schedule.csv`;
 const schedule = await loadCSV(schedPath).catch(() => []);
 
-const playoffsBegun = playoffsHaveBegun(schedule);
-applyDefaultStage(elStage, seasonId, {
-  playoffsEnabled: hasPlayoffsThisSeason,
-  playoffsBegun
-});
+let playoffsBegun = false;
+try { playoffsBegun = playoffsHaveBegun(schedule); } catch { playoffsBegun = false; }
+let stage = "REG";
 
-const stage = elStage.value; // "REG" | "PO"
+if (elStage) {
+  applyDefaultStage(elStage, seasonId, {
+    playoffsEnabled: hasPlayoffsThisSeason,
+    playoffsBegun
+  });
+  stage = elStage.value; // "REG" | "PO"
+}
+
 const playersPath = (stage === "PO" && hasPlayoffsThisSeason)
   ? playoffPlayersPath
   : regularPlayersPath;
@@ -100,7 +111,6 @@ const playersPath = (stage === "PO" && hasPlayoffsThisSeason)
     const seasonRow = seasons.find(s => String(s.season_id ?? "").trim() === seasonId);
     const advOn = (toIntMaybe(seasonRow?.adv_stats) ?? 0) === 1;
     document.body.classList.toggle("hide-adv", !advOn);
-    renderGameLogStub(seasonId, advOn);
 
     // Find player in current season
     const pSeason = players.find(x => String(x.player_key ?? "").trim() === String(playerKey).trim());
@@ -121,16 +131,19 @@ const playersPath = (stage === "PO" && hasPlayoffsThisSeason)
     const careerAgg = await computeCareerAgg(seasons, playerKey, stage);
 
     renderStats(pSeason, careerAgg, advOn);
+	
+	    await renderGameLog(seasonId, advOn, stage, teams, schedule, pSeason);
 
     elHero.hidden = false;
     elBody.hidden = false;
     clearStatus();
-  } catch (err) {
-    console.error(err);
-    setStatus(`No data exists for Season ${getSeasonId()}.`);
-    elHero.hidden = true;
-    elBody.hidden = true;
-  }
+} catch (err) {
+  console.error(err);
+  const msg = (err && err.message) ? err.message : String(err);
+  setStatus(`Player page error: ${msg}`);
+  elHero.hidden = true;
+  elBody.hidden = true;
+}
 }
 
 /* ------------------------- career aggregation ------------------------- */
@@ -158,6 +171,9 @@ async function computeCareerAgg(seasons, playerKey, stage) {
     gp_s: 0, g: 0, a: 0, pts: 0, shots: 0,
     hits: 0, takeaways: 0, turnovers: 0,
     sp: 0,
+	toi_s: 0, // skater TOI (seconds)
+toi_g: 0, // goalie TOI (seconds)
+
 
     // Goalie totals
     gp_g: 0, sa: 0, ga: 0,
@@ -177,7 +193,20 @@ async function computeCareerAgg(seasons, playerKey, stage) {
     agg.gp_s += (toIntMaybe(r.gp_s) ?? 0);
     agg.g    += (toIntMaybe(r.g) ?? 0);
     agg.a    += (toIntMaybe(r.a) ?? 0);
-    agg.pts  += (toIntMaybe(r.pts) ?? 0);
+agg.pts  += (toIntMaybe(r.pts) ?? 0);
+
+// ---- TOI (role-aware, supports S/G in same season) ----
+const gpS = (toIntMaybe(r.gp_s) ?? 0);
+const gpG = (toIntMaybe(r.gp_g) ?? 0);
+
+const toiS = (toIntMaybe(r.toi_s) ?? 0);
+const toiG = (toIntMaybe(r.toi_g) ?? 0);
+
+// Legacy fallback (older seasons)
+const toiLegacy = (toIntMaybe(r.toi) ?? 0);
+
+if (gpS > 0) agg.toi_s += (toiS > 0 ? toiS : toiLegacy);
+if (gpG > 0) agg.toi_g += (toiG > 0 ? toiG : toiLegacy);
 
     const shotsRaw = (r.shots ?? "").toString().trim();
     const shotsVal = shotsRaw === "" ? null : Number(shotsRaw);
@@ -279,17 +308,18 @@ function renderStats(pSeason, career, advOn) {
   const s_g  = toIntMaybe(pSeason.g) ?? 0;
   const s_a  = toIntMaybe(pSeason.a) ?? 0;
   const s_pts= toIntMaybe(pSeason.pts) ?? 0;
+  const c_toi_total = (career.toi_s ?? 0) + (career.toi_g ?? 0);
 
-  const s_ppgCsv = toNumMaybe(pSeason.p_per_gp);
-  const s_ppg = (s_ppgCsv != null && Number.isFinite(s_ppgCsv))
-    ? s_ppgCsv
-    : (s_gp > 0 ? s_pts / s_gp : null);
+const s_ppgCsv = toNumMaybe(pSeason.p_per_gp);
+const s_ppg = (s_ppgCsv != null && Number.isFinite(s_ppgCsv))
+  ? s_ppgCsv
+  : perGpNormalized(s_pts, pSeason, "SKATER", advOn);
 
-  const s_sp = toNumMaybe(pSeason.sp);
-  const s_spgCsv = toNumMaybe(pSeason.sp_per_gp);
-  const s_spg = (s_spgCsv != null && Number.isFinite(s_spgCsv))
-    ? s_spgCsv
-    : (s_gp > 0 && s_sp != null ? s_sp / s_gp : null);
+const s_sp = toNumMaybe(pSeason.sp);
+const s_spgCsv = toNumMaybe(pSeason.sp_per_gp);
+const s_spg = (s_spgCsv != null && Number.isFinite(s_spgCsv))
+  ? s_spgCsv
+  : perGpNormalized(s_sp, pSeason, "SKATER", advOn);
 
   const s_shots = parseShots(pSeason.shots);
   const s_shp = (s_shots != null && s_shots > 0) ? (s_g / s_shots) * 100 : null;
@@ -301,8 +331,15 @@ function renderStats(pSeason, career, advOn) {
   const c_pts= career.pts ?? 0;
   const c_sp = career.sp ?? 0;
 
-  const c_ppg = (c_gp > 0) ? (c_pts / c_gp) : null;
-  const c_spg = (c_gp > 0) ? (c_sp / c_gp) : null;
+const c_toi_s = career.toi_s ?? 0;
+
+const c_ppg = (c_toi_s > 0)
+  ? (c_pts * 900 / c_toi_s)
+  : (c_gp > 0 ? (c_pts / c_gp) : null);
+
+const c_spg = (c_toi_total > 0)
+  ? (c_sp * 900 / c_toi_total)
+  : (c_gp > 0 ? (c_sp / c_gp) : null);
 
   const c_shots = (career.shots ?? 0);
   const c_shp = (c_shots > 0) ? (c_g / c_shots) * 100 : null;
@@ -339,35 +376,42 @@ function renderStats(pSeason, career, advOn) {
     ? (g_svpCsv * 100)
     : (g_sa != null && g_sa > 0 && g_sv != null ? (g_sv / g_sa) * 100 : null);
 
-  const g_gaaCsv = toNumMaybe(pSeason.gaa);
-  const g_gaa = (g_gaaCsv != null && Number.isFinite(g_gaaCsv))
-    ? g_gaaCsv
-    : (g_gp > 0 && g_ga != null ? (g_ga / g_gp) : null);
+const g_gaaCsv = toNumMaybe(pSeason.gaa);
+const g_gaa = (g_gaaCsv != null && Number.isFinite(g_gaaCsv))
+  ? g_gaaCsv
+  : perGpNormalized(g_ga, pSeason, "GOALIE", advOn);
 
   const g_w = toIntMaybe(pSeason.wins);
   const g_so = toIntMaybe(pSeason.so);
 
-  const g_sp = toNumMaybe(pSeason.sp);
-  const g_spgCsv = toNumMaybe(pSeason.sp_per_gp);
-  const g_spg = (g_spgCsv != null && Number.isFinite(g_spgCsv))
-    ? g_spgCsv
-    : (g_gp > 0 && g_sp != null ? g_sp / g_gp : null);
+const g_sp = toNumMaybe(pSeason.sp);
+const g_spgCsv = toNumMaybe(pSeason.sp_per_gp);
+const g_spg = (g_spgCsv != null && Number.isFinite(g_spgCsv))
+  ? g_spgCsv
+  : perGpNormalized(g_sp, pSeason, "GOALIE", advOn);
 
   // ---------------- Goalie (Career) ----------------
   const cg_gp = career.gp_g ?? 0;
   const cg_sa = career.sa ?? 0;
   const cg_ga = career.ga ?? 0;
   const cg_sv = (cg_sa > 0) ? (cg_sa - cg_ga) : null;
+    const cg_sp = career.sp ?? 0;
 
   const cg_svp = (cg_sa > 0 && cg_sv != null) ? (cg_sv / cg_sa) * 100 : null;
-  const cg_gaa = (cg_gp > 0) ? (cg_ga / cg_gp) : null;
+const c_toi_g = career.toi_g ?? 0;
+
+const cg_gaa = (c_toi_g > 0)
+  ? (cg_ga * 900 / c_toi_g)
+  : (cg_gp > 0 ? (cg_ga / cg_gp) : null);
+
+const cg_spg = (c_toi_total > 0)
+  ? (cg_sp * 900 / c_toi_total)
+  : (cg_gp > 0 ? (cg_sp / cg_gp) : null);
 
   const cg_w = career.wins ?? 0;
   const cg_so = career.so ?? 0;
 
   // SP career is shared; SP/GP for goalie uses goalie GP
-  const cg_sp = career.sp ?? 0;
-  const cg_spg = (cg_gp > 0) ? (cg_sp / cg_gp) : null;
 
   if (g_gp > 0 || cg_gp > 0) {
     addRow3(goalieBody, "GP", g_gp || "", cg_gp || "");
@@ -458,6 +502,45 @@ function renderMissingPlayer(seasonId, playerKey) {
     </div>
   `;
 }
+function normalizeName(s){
+  return String(s ?? "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "")
+    .trim();
+}
+
+function displayTeamName(t) {
+  return (
+    (t?.team_name ?? "").trim() ||
+    (t?.full_name ?? "").trim() ||
+    (t?.name ?? "").trim() ||
+    (t?.team_id ?? "").trim() ||
+    "UNKNOWN"
+  );
+}
+function stageShortLabel(stage){
+  const s = String(stage ?? "").trim().toLowerCase();
+  if (s === "qf") return "QF";
+  if (s === "sf") return "SF";
+  if (s === "f")  return "F";
+  if (s === "reg") return "";
+  return s ? s.toUpperCase() : "";
+}
+
+function weekLabelForMatch(schedRow){
+  if (!schedRow) return "";
+  const st = String(schedRow.stage ?? "").trim().toLowerCase() || "reg";
+  if (st === "reg") return String(toIntMaybe(schedRow.week) ?? "");
+  return stageShortLabel(st);
+}
+
+function isGoalieBoxRow(r){
+  const pos = String(r.position ?? "").trim().toUpperCase();
+  if (pos === "G") return true;
+  const sa = toIntMaybe(r.sa);
+  const ga = toIntMaybe(r.ga);
+  return (sa != null || ga != null);
+}
 
 function escapeHtml(s) {
   return String(s ?? "")
@@ -509,3 +592,174 @@ function renderGameLogStub(seasonId, advOn) {
   elGameLogStatus.hidden = false;
   elGameLogStatus.textContent = `Game log not available yet for Season ${seasonId}.`;
 }
+function perGpNormalized(total, row, scope, advStatsOn){
+  const x = toNumMaybe(total);
+  if (x == null) return null;
+
+  if (advStatsOn){
+    const toi =
+      scope === "GOALIE"
+        ? toNumMaybe(row.toi_g ?? row.toi)
+        : toNumMaybe(row.toi_s ?? row.toi);
+
+    if (toi && toi > 0){
+      return x * 900 / toi;
+    }
+  }
+
+  // legacy fallback (per appearance)
+  const gp =
+    scope === "GOALIE"
+      ? toNumMaybe(row.gp_g)
+      : toNumMaybe(row.gp_s);
+
+  return gp && gp > 0 ? x / gp : null;
+}
+async function renderGameLog(seasonId, advOn, stage, teams, schedule, pSeason) {
+  gameLogBody.innerHTML = "";
+
+  if (!advOn) {
+    elGameLogTable.hidden = true;
+    elGameLogStatus.hidden = false;
+    elGameLogStatus.textContent = `No stats for Season ${seasonId}.`;
+    return;
+  }
+
+  const boxPath = (stage === "PO")
+    ? `../data/${seasonId}/boxscores_playoffs.csv`
+    : `../data/${seasonId}/boxscores.csv`;
+
+  const boxOk = await urlExists(boxPath);
+  if (!boxOk) {
+    elGameLogTable.hidden = true;
+    elGameLogStatus.hidden = false;
+    elGameLogStatus.textContent = `Game log not available yet for Season ${seasonId}.`;
+    return;
+  }
+
+  let rows = [];
+  try { rows = await loadCSV(boxPath); }
+  catch { rows = []; }
+
+  const tmap = new Map(teams.map(t => [String(t.team_id ?? "").trim(), t]));
+
+  // quick schedule lookup by match_id
+  const schedById = new Map((schedule || []).map(s => [String(s.match_id ?? "").trim(), s]));
+
+  const playerSteam =
+    String(pSeason.steam_id ?? pSeason.steamid ?? pSeason.steamID ?? pSeason.steam ?? pSeason.steam64 ?? "").trim();
+  const playerNameNorm = normalizeName(pSeason.name);
+
+  const mine = rows.filter(r => {
+    const rSteam = String(r.steam_id ?? r.steamid ?? r.steamID ?? r.steam ?? r.steam64 ?? "").trim();
+    if (playerSteam && rSteam && rSteam === playerSteam) return true;
+
+    const rNameNorm = normalizeName(r.player_name);
+    return rNameNorm && playerNameNorm && rNameNorm === playerNameNorm;
+  });
+
+  if (mine.length === 0) {
+    elGameLogTable.hidden = true;
+    elGameLogStatus.hidden = false;
+    elGameLogStatus.textContent = `No games logged yet for Season ${seasonId}.`;
+    return;
+  }
+
+  // Decide whether to render skater vs goalie game log
+  const anyGoalieRows = mine.some(isGoalieBoxRow);
+  const pos = String(pSeason.position ?? "").toUpperCase();
+  const showGoalie = (pos === "G" || (pos.includes("G") && !pos.includes("S"))) || anyGoalieRows;
+
+  // Sort by match_id (good enough for your M1-G1 style ids)
+  mine.sort((a, b) => String(a.match_id ?? "").localeCompare(String(b.match_id ?? "")));
+
+  // Header
+  const thead = elGameLogTable.querySelector("thead");
+  if (thead) {
+    thead.innerHTML = showGoalie
+      ? `
+        <tr>
+          <th>Week</th>
+          <th>Opponent</th>
+          <th>SA</th>
+          <th>SV</th>
+          <th>SV%</th>
+        </tr>
+      `
+      : `
+        <tr>
+          <th>Week</th>
+          <th>Opponent</th>
+          <th>G</th>
+          <th>A</th>
+          <th>PTS</th>
+          <th>S</th>
+        </tr>
+      `;
+  }
+
+  // Body
+  for (const r of mine) {
+    const matchId = String(r.match_id ?? "").trim();
+    const sched = schedById.get(matchId) || null;
+
+    const myTeamId = String(r.team_id ?? "").trim();
+    const oppTeamId = (() => {
+      if (!sched) return "";
+      const h = String(sched.home_team_id ?? "").trim();
+      const a = String(sched.away_team_id ?? "").trim();
+      if (myTeamId && h === myTeamId) return a;
+      if (myTeamId && a === myTeamId) return h;
+      return (h && h !== myTeamId) ? h : a;
+    })();
+
+    const oppName = displayTeamName(tmap.get(oppTeamId) || { team_id: oppTeamId });
+
+    const weekLabel = weekLabelForMatch(sched);
+
+    const href = `boxscore.html?season=${encodeURIComponent(seasonId)}&match_id=${encodeURIComponent(matchId)}`;
+
+    const tr = document.createElement("tr");
+	tr.classList.add("clickable-row");
+tr.addEventListener("click", () => {
+  window.location.href = href;
+});
+
+
+    if (showGoalie) {
+      const sa = toIntMaybe(r.sa);
+      const ga = toIntMaybe(r.ga);
+      const sv = (sa != null && ga != null) ? (sa - ga) : null;
+      const svp = (sa != null && sa > 0 && sv != null) ? (sv / sa) * 100 : null;
+
+      tr.innerHTML = `
+        <td>${escapeHtml(weekLabel || "")}</td>
+        <td>${escapeHtml(oppName || "")}</td>
+        <td class="num">${valOrBlank(sa)}</td>
+        <td class="num">${valOrBlank(sv)}</td>
+        <td class="num">${fmtPct(svp, 1)}</td>
+      `;
+    } else {
+      const g = toIntMaybe(r.g) ?? 0;
+      const a = toIntMaybe(r.a) ?? 0;
+      const pts = (toIntMaybe(r.pts) ?? (g + a));
+      const shots = toIntMaybe(r.shots);
+
+      tr.innerHTML = `
+        <td>${escapeHtml(weekLabel || "")}</td>
+        <td>${escapeHtml(oppName || "")}</td>
+        <td class="num">${valOrBlank(g)}</td>
+        <td class="num">${valOrBlank(a)}</td>
+        <td class="num">${valOrBlank(pts)}</td>
+        <td class="num">${valOrBlank(shots)}</td>
+      `;
+    }
+
+    gameLogBody.appendChild(tr);
+  }
+
+  elGameLogStatus.hidden = true;
+  elGameLogTable.hidden = false;
+}
+
+
