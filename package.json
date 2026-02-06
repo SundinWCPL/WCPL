@@ -4,3 +4,16 @@
     "papaparse": "^5.5.3"
   }
 }
+
+{
+  "name": "wcpl-tools",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "import:game": "node ops/extractor/import-game.js"
+  },
+  "dependencies": {
+    "minimist": "^1.2.8",
+    "papaparse": "^5.4.1"
+  }
+}
