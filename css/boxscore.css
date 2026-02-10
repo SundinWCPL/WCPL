@@ -22,7 +22,6 @@ body.boxscore-page .scoreboard{
   box-sizing: border-box;
 }
 
-
 /* FINAL / PREVIEW label */
 .result-label{
   text-align: center;
@@ -113,17 +112,41 @@ body.boxscore-page .scorebar{
   white-space: nowrap;
 }
 
-/* Optional SOG line (only shown when adv_stats=1 and played) */
-.mid-sog{
-  margin-top: 8px;
-  font-size: 13px;
+/* ===============================
+   Team pill SOG (under team name)
+   Centered in the open space between logo and far edge
+   =============================== */
+
+.pill-text{
+  flex: 1 1 auto;     /* KEY: fill remaining space in the pill */
+  min-width: 0;       /* allow ellipsis */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+/* Name centered within the available space */
+.pill-text .pill-name{
+  width: 100%;
+  margin: 0;
+  text-align: center;
+
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* SOG centered under the name */
+.pill-sog{
+  font-size: 24px;
   font-weight: 900;
   letter-spacing: 0.10em;
   text-transform: uppercase;
-  color: #b8c0cc;
-  white-space: nowrap;
+  opacity: 0.9;
+  text-align: center;
 }
-
 
 /* ===============================
    Banner / Status Message
@@ -318,7 +341,52 @@ body.boxscore-page .scorebar{
     inset 0 0 0 1px rgba(255,255,255,0.04);
 }
 
-.pill-name{
-  margin: 0 auto;     /* centers name within available space */
+/* Stars */
+.data-table td .team-link{
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ===============================
+   Game Stars (1st / 2nd / 3rd)
+   =============================== */
+
+.game-star{
+  margin-left: 6px;
+  font-size: 14px;
+  line-height: 1;
+  vertical-align: middle;
+}
+
+.star-gold{
+  color: #f5c542;
+}
+
+.star-silver{
+  color: #cfd6dd;
+}
+
+.star-bronze{
+  color: #8b5a2b; 
+}
+
+/* ===============================
+   Shot Map (Plotly)
+   =============================== */
+
+.shotmap-wrap{
+  padding: 0 10px 10px;
+}
+
+.shotmap{
+  width: 100%;
+  height: 380px;              /* tweak later if you want taller */
+  border-radius: 12px;
+  border: 1px solid #232a35;
+  background: #0b0f14;
+  overflow: hidden;
+}
+.subhead.center {
   text-align: center;
 }

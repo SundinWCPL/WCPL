@@ -21,6 +21,7 @@
       <a href="players.html">Players</a>
       <a href="games.html">Games</a>
 	  <a href="charts.html">Charts</a>
+	  <a href="pages/fantasy.html">Fantasy</a>
     </nav>
 
     <div class="header-right">
@@ -38,9 +39,16 @@
 
 <section id="scoreboard" class="scoreboard" hidden>
   <div id="resultLabel" class="result-label"></div>
+
+  <!-- NEW: SOG line -->
+  <div id="sogLine" class="sog-line" hidden>
+    <span class="sog-away" id="awaySog"></span>
+    <span class="sog-label">SOG</span>
+    <span class="sog-home" id="homeSog"></span>
+  </div>
+
   <div id="scorePill"></div>
 </section>
-
 
     <div id="banner" class="banner" hidden></div>
 
@@ -111,6 +119,11 @@
             <thead></thead><tbody></tbody>
           </table>
         </div>
+		<h3 class="subhead center">Shot Map</h3>
+<div class="shotmap-wrap">
+  <div id="homeShotMap" class="shotmap"></div>
+</div>
+
       </div>
 
       <div class="card">
@@ -129,10 +142,14 @@
             <thead></thead><tbody></tbody>
           </table>
         </div>
+		<h3 class="subhead center">Shot Map</h3>
+<div class="shotmap-wrap">
+  <div id="awayShotMap" class="shotmap"></div>
+</div>
       </div>
     </section>
   </main>
-
+<script src="https://cdn.plot.ly/plotly-2.30.0.min.js"></script>
   <script type="module" src="../js/boxscore.js?v=2"></script>
 </body>
 </html>

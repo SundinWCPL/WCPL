@@ -38,6 +38,8 @@ let games = [];
 let players = [];
 let boxscores = [];
 
+let starMap = new Map();
+
 boot();
 
 async function boot() {
@@ -162,7 +164,7 @@ catch { players = []; }
 playerMaps = buildPlayerMaps(players);
 
     if (advOn && rowsForMatch.length > 0) {
-      renderPlayedBoxscore(seasonId, homeTeam, awayTeam, rowsForMatch);
+      renderPlayedBoxscore(seasonId, homeTeam, awayTeam, rowsForMatch, gameRow);
       show(elPlayedBoxscore);
     } else {
       // Lite mode banner
@@ -193,6 +195,10 @@ function renderScoreboard({ seasonId, matchId, stage, week, status, homeTeam, aw
   const hg = toIntMaybe(gameRow?.home_goals);
   const ag = toIntMaybe(gameRow?.away_goals);
   const ot = toIntMaybe(gameRow?.ot) ?? 0;
+  
+    const hs = toIntMaybe(gameRow?.home_shots ?? gameRow?.home_sog ?? gameRow?.home_sf);
+  const as = toIntMaybe(gameRow?.away_shots ?? gameRow?.away_sog ?? gameRow?.away_sf);
+
   
     // ----- Page header: "Week 1 - Game 2 of 3" / "Semi Finals - Game 2 of 5" (+ series winner)
   const gNum = parseGameNum(matchId);
@@ -276,7 +282,15 @@ if (status === "cancelled") {
              class="pill-logo"
              alt="${homeTeam.team_id}"
              onerror="this.style.visibility='hidden'">
-        <span class="pill-name">${escapeHtml(homeName)}</span>
+        <div class="pill-text left">
+  <span class="pill-name">${escapeHtml(homeName)}</span>
+  ${
+    (played && hs != null)
+      ? `<span class="pill-sog">SOG: ${hs}</span>`
+      : ``
+  }
+</div>
+
       </div>
 
       <div class="mid-pill">
@@ -290,7 +304,14 @@ if (status === "cancelled") {
        --team-bg:${escapeHtml(awayBg)};
      ">
 
-        <span class="pill-name">${escapeHtml(awayName)}</span>
+        <div class="pill-text right">
+  <span class="pill-name">${escapeHtml(awayName)}</span>
+  ${
+    (played && as != null)
+      ? `<span class="pill-sog">SOG: ${as}</span>`
+      : ``
+  }
+</div>
         <img src="${teamLogoUrl(seasonId, awayTeam.team_id)}"
              class="pill-logo"
              alt="${awayTeam.team_id}"
@@ -428,15 +449,41 @@ const ppg = (ppgCsv != null && Number.isFinite(ppgCsv))
   elGo.hidden = false;
 }
 
-function renderPlayedBoxscore(seasonId, homeTeam, awayTeam, matchRows) {
+function renderPlayedBoxscore(seasonId, homeTeam, awayTeam, matchRows, gameRow) {
   setText("homePlayedTitle", displayTeamName(homeTeam));
   setText("awayPlayedTitle", displayTeamName(awayTeam));
 
   const homeRows = matchRows.filter(r => String(r.team_id ?? "").trim() === homeTeam.team_id);
   const awayRows = matchRows.filter(r => String(r.team_id ?? "").trim() === awayTeam.team_id);
+const stars = computeThreeStars(matchRows);
+starMap = new Map();
+stars.forEach((s, i) => {
+  starMap.set(`${s.team_id}|${normalizeName(s.player_name)}`, i + 1);
+});
 
   renderGameTeamTables(seasonId, homeRows, T.homeGameSkaters, T.homeGameGoalies);
   renderGameTeamTables(seasonId, awayRows, T.awayGameSkaters, T.awayGameGoalies);
+  
+    // Shot maps (from games.csv shot_summary)
+  const allShots = parseShotSummary(gameRow?.shot_summary);
+
+  // Convention: importer writes Red=home, Blue=away
+  const homeShots = allShots.filter(e => String(e.teamColor).trim().toLowerCase() === "red");
+  const awayShots = allShots.filter(e => String(e.teamColor).trim().toLowerCase() === "blue");
+
+  renderShotMapPlotly({
+    divId: "homeShotMap",
+    events: homeShots,
+    seasonId,
+    teamLabel: displayTeamName(homeTeam)
+  });
+
+  renderShotMapPlotly({
+    divId: "awayShotMap",
+    events: awayShots,
+    seasonId,
+    teamLabel: displayTeamName(awayTeam)
+  });
 
   T.homeGameSkaters.hidden = false;
   T.homeGameGoalies.hidden = false;
@@ -477,8 +524,8 @@ function renderGameTeamTables(seasonId, rows, elSk, elGo) {
   });
 
   // Headers (your “full nerd minus touches/toi”)
-  setTableHeader(elSk, ["Player", "Pos", "G", "A", "S", "Pass", "Ex", "En", "HIT", "TA", "TO", "FOW", "FOL", "Poss (s)"]);
-  setTableHeader(elGo, ["Goalie", "SA", "GA", "SV%", "BodySv", "StickSv", "W", "SO"]);
+  setTableHeader(elSk, ["Player", "Pos", "G", "A", "Sh", "Pass", "Ex", "En", "HIT", "TA", "TO", "FOW", "FOL", "Poss (s)", "SP"]);
+  setTableHeader(elGo, ["Goalie", "SA", "GA", "SV%", "SV", "Body Sv", "Stick Sv", "Pass", "W", "SO", "SP"]);
 
   fillTable(elSk, sk.map(r => ([
     playerLinkHtmlFromBox(seasonId, r),
@@ -495,22 +542,27 @@ function renderGameTeamTables(seasonId, rows, elSk, elGo) {
     valOrBlank(r.fow),
     valOrBlank(r.fol),
     valOrBlank(r.poss_s),
+	valOrBlank(r.sp),
   ])));
 
   fillTable(elGo, go.map(r => {
     const sa = toIntMaybe(r.sa) ?? 0;
     const ga = toIntMaybe(r.ga) ?? 0;
     const svp = sa > 0 ? ((sa - ga) / sa) : null;
+	const sv = sa - ga;
 
     return [
       playerLinkHtmlFromBox(seasonId, r),
       valOrBlank(r.sa),
       valOrBlank(r.ga),
       fmtPct(svp, 1),
+	  String(sv),
       valOrBlank(r.body_sv),
       valOrBlank(r.stick_sv),
+	  valOrBlank(r.passes),
       valOrBlank(r.w),
       valOrBlank(r.so),
+	  valOrBlank(r.sp),
     ];
   }));
 
@@ -690,24 +742,34 @@ function playerLinkHtmlFromBox(seasonId, r) {
   const rawName = String(r.player_name ?? "").trim();
   if (!rawName) return "Unknown";
 
+  // star lookup (use rawName exactly like your starMap currently stores it)
+  const starKey = `${String(r.team_id ?? "").trim()}|${normalizeName(rawName)}`;
+  const star = starMap?.get(starKey);
+
   // Support common boxscores.csv steam id column names
-  const steam =
-    String(r.steam_id ?? r.steamid ?? r.steamID ?? r.steam ?? r.steam64 ?? "").trim();
+const steam =
+  normalizeId(r.steam_id ?? r.steamid ?? r.steamID ?? r.steam ?? r.steam64);
 
   const p =
     (steam && playerMaps?.bySteam?.get(steam)) ||
     playerMaps?.byName?.get(normalizeName(rawName)) ||
     null;
 
-  if (p?.player_key){
+  if (p?.player_key) {
     const href =
       `player.html?season=${encodeURIComponent(seasonId)}` +
       `&player_key=${encodeURIComponent(p.player_key)}`;
 
-    return `<a class="team-link" href="${href}">${escapeHtml(p.name)}</a>`;
+    const label = star
+      ? `${escapeHtml(p.name)} ${starGlyph(star)}`
+      : escapeHtml(p.name);
+
+    return `<a class="team-link" href="${href}">${label}</a>`;
   }
 
-  return escapeHtml(rawName);
+  return star
+    ? `${escapeHtml(rawName)} ${starGlyph(star)}`
+    : escapeHtml(rawName);
 }
 
 
@@ -828,11 +890,22 @@ function perGpNormalized(total, row, scope, advStatsOn){
 
   return gp && gp > 0 ? x / gp : null;
 }
-function normalizeName(s){
-  return String(s ?? "")
+function normalizeName(name){
+  return String(name ?? "")
+    .trim()
     .toLowerCase()
-    .replace(/[^a-z0-9]/g, "")
-    .trim();
+    .replace(/[_\s]+/g, "")      // remove spaces/underscores
+    .replace(/[^a-z0-9]/g, "");  // strip punctuation
+}
+
+function normalizeId(v){
+  let s = String(v ?? "").trim();
+  // common "Excel-safe" prefixes
+  s = s.replace(/^=+/, "");   // "=7656..." -> "7656..."
+  s = s.replace(/^'+/, "");   // "'7656..." -> "7656..."
+  // remove any accidental whitespace
+  s = s.replace(/\s+/g, "");
+  return s;
 }
 
 function buildPlayerNameMap(players){
@@ -848,9 +921,6 @@ function buildPlayerNameMap(players){
     }
   }
   return map;
-}
-function normalizeId(s){
-  return String(s ?? "").trim();
 }
 
 function buildPlayerMaps(players){
@@ -869,6 +939,253 @@ function buildPlayerMaps(players){
   }
 
   return { bySteam, byName };
+}
+
+function parseShotSummary(summary) {
+  const s = String(summary ?? "").trim();
+  if (!s) return [];
+
+  // Format per event:
+  // P{period} mm:ss|Team|SteamID|shotType|speed|x|z|result
+  return s.split(";").map(part => {
+    const fields = part.split("|");
+    return {
+      t: fields[0] ?? "",
+      teamColor: fields[1] ?? "",      // "Red" / "Blue"
+      steamId: fields[2] ?? "",
+      shotType: fields[3] ?? "",
+      speed: toNumMaybe(fields[4]),
+      x: toNumMaybe(fields[5]),
+      z: toNumMaybe(fields[6]),
+      result: fields[7] ?? ""          // "G" or "S"
+    };
+  }).filter(e => Number.isFinite(e.x) && Number.isFinite(e.z));
+}
+
+function distToNet(x, z) {
+  const NET_X = 0;
+  const NET_Z = 39.8; // goal line
+  const dx = x - NET_X;
+  const dz = z - NET_Z;
+  return Math.sqrt(dx*dx + dz*dz);
+}
+
+function renderShotMapPlotly({ divId, events, seasonId, teamLabel }) {
+  const el = document.getElementById(divId);
+  if (!el) return;
+  const RINK_X = 22.3;
+const END_Z  = 45.6;
+const BLUE_Z = 13.25;
+const GOAL_Z = 39.8;
+const NET_BACK_Z = 41.3;
+const POST_X_L = -1.5;
+const POST_X_R =  1.5;
+const NET_DEPTH_VIS = 2.2;   // how deep the net goes (visual)
+const NET_CORNER_R  = 0.6;   // roundness of back corners (visual)
+const BOARD_CORNER_R = 2.5; // meters, visual only
+const CREASE_RADIUS = 3.2; // visual, meters
+const CREASE_COLOR  = "#5dade2"; // soft crease blue
+const CREASE_FILL = "rgba(70, 150, 255, 0.18)";   // soft fill
+const CREASE_LINE = "rgba(70, 150, 255, 0.55)";   // slightly darker outline
+
+  if (!events || events.length === 0 || typeof Plotly === "undefined") {
+    el.innerHTML = "";
+    el.style.display = "none";
+    return;
+  }
+  el.style.display = "block";
+function creaseClosedPath(cx, cz, r, steps = 48) {
+  // Builds: left goal-line point -> true semicircle -> right goal-line point -> back along goal line -> close
+  // Arc bulges toward center ice (down in z).
+  const pts = [];
+  for (let i = 0; i <= steps; i++) {
+    const t = Math.PI - (Math.PI * i) / steps; // start left, end right
+    const x = cx + r * Math.cos(t);
+    const z = cz - r * Math.sin(t);
+    pts.push([x, z]);
+  }
+
+  const [x0, z0] = pts[0];                 // left goal-line point (z ~ cz)
+  let d = `M ${x0},${z0}`;
+  for (let i = 1; i < pts.length; i++) {
+    const [xi, zi] = pts[i];
+    d += ` L ${xi},${zi}`;
+  }
+  const [xN, zN] = pts[pts.length - 1];    // right goal-line point (z ~ cz)
+  d += ` L ${xN},${cz}`;                   // ensure exactly on goal line
+  d += ` L ${x0},${cz} Z`;                 // back along goal line and close
+  return d;
+}
+
+  // Split: goals vs on-net
+  const goals = events.filter(e => (e.result || "").toUpperCase() === "G");
+  const onNet = events.filter(e => (e.result || "").toUpperCase() !== "G");
+
+const nameFromSteam = (steamId) => {
+  const key = normalizeId(steamId);
+  const p = key ? playerMaps?.bySteam?.get(key) : null;
+  return p?.name || "";
+};
+
+  const makeTrace = (arr, name, marker) => ({
+    type: "scatter",
+    mode: "markers",
+    name,
+    x: arr.map(e => e.x),
+    y: arr.map(e => e.z),
+    customdata: arr.map(e => {
+      const player = nameFromSteam(e.steamId) || `Unknown (${e.steamId || "?"})`;
+      const dist = distToNet(e.x, e.z);
+      return [
+        player,
+        String(e.t || "").replace(/^P\d+\s*/i, ""),
+        Number.isFinite(dist) ? dist.toFixed(1) : "",
+        String(e.shotType || "")
+  .replace(/_/g, " ")
+  .replace(/^./, c => c.toUpperCase()),
+        (e.speed != null && Number.isFinite(e.speed)) ? (e.speed * 3.6).toFixed(1) : ""
+      ];
+    }),
+    hovertemplate:
+      "<b>%{customdata[0]}</b><br>" +
+      "%{customdata[1]}<br>" +
+      "Distance: %{customdata[2]} m<br>" +
+      "Type: %{customdata[3]}<br>" +
+      "Speed: %{customdata[4]} km/h<br>" +
+      "<extra></extra>",
+    marker
+  });
+
+  const data = [
+    makeTrace(onNet, "On Net", { size: 9, opacity: 0.85, line: { width: 1 } }),
+    makeTrace(goals, "Goal",  { size: 13, opacity: 0.95, line: { width: 1 } }),
+  ];
+const PAD_X = 1; // meters – visual padding past boards
+  const layout = {
+    title: null,
+    margin: { l: 4, r: 4, t: 4, b: 4 },
+    showlegend: true,
+    legend: { orientation: "h" },
+    paper_bgcolor: "#ffffff",
+	plot_bgcolor: "#ffffff",
+	autosize: true,
+xaxis: {
+  range: [-(RINK_X + PAD_X), (RINK_X + PAD_X)],
+  visible: false,
+  fixedrange: true,
+  domain: [0, 1]
+},
+yaxis: {
+  range: [13.1, END_Z+.1],
+  visible: false,
+  fixedrange: true,
+  domain: [0, 1]
+},
+shapes: [
+// Boards outline (rounded top corners)
+{
+  type: "path",
+  path: (() => {
+    const r = Math.min(BOARD_CORNER_R, RINK_X, END_Z);
+    return `
+      M ${-RINK_X},0
+      L ${-RINK_X},${END_Z - r}
+      Q ${-RINK_X},${END_Z} ${-RINK_X + r},${END_Z}
+      L ${RINK_X - r},${END_Z}
+      Q ${RINK_X},${END_Z} ${RINK_X},${END_Z - r}
+      L ${RINK_X},0
+      Z
+    `;
+  })(),
+  line: { width: 2, color: "#000" }
+},
+
+  // Blue line (blue!)
+  { type: "line", x0: -RINK_X, x1: RINK_X, y0: BLUE_Z, y1: BLUE_Z, line: { width: 2, color: "#1e66ff" } },
+
+  
+// Crease (NHL style: filled)
+{
+  type: "path",
+  path: creaseClosedPath(0, GOAL_Z, CREASE_RADIUS, 64),
+  line: { width: 2, color: CREASE_LINE },
+  fillcolor: CREASE_FILL
+},
+
+  // Goal line (red!)
+  { type: "line", x0: -RINK_X, x1: RINK_X, y0: GOAL_Z, y1: GOAL_Z, line: { width: 2, color: "#d62728" } },
+
+  // Net posts (small black dots)
+  { type: "circle", x0: POST_X_L - 0.15, x1: POST_X_L + 0.15, y0: GOAL_Z - 0.15, y1: GOAL_Z + 0.15, line: { width: 2, color: "#000" } },
+  { type: "circle", x0: POST_X_R - 0.15, x1: POST_X_R + 0.15, y0: GOAL_Z - 0.15, y1: GOAL_Z + 0.15, line: { width: 2, color: "#000" } },
+
+// Net outline (rounded rectangle: straight sides + rounded back corners)
+{
+  type: "path",
+  path: (() => {
+    const backZ = GOAL_Z + NET_DEPTH_VIS;
+    const r = Math.min(NET_CORNER_R, NET_DEPTH_VIS, (POST_X_R - POST_X_L) / 2);
+    // Start at left post on goal line, go back, across, then forward to right post.
+    return `M ${POST_X_L},${GOAL_Z}
+            L ${POST_X_L},${backZ - r}
+            Q ${POST_X_L},${backZ} ${POST_X_L + r},${backZ}
+            L ${POST_X_R - r},${backZ}
+            Q ${POST_X_R},${backZ} ${POST_X_R},${backZ - r}
+            L ${POST_X_R},${GOAL_Z}`;
+  })(),
+  line: { width: 2.5, color: "#000" }
+}
+]
+  };
+
+  Plotly.newPlot(el, data, layout, {
+  displayModeBar: false,
+  responsive: true
+});
+}
+
+function computeThreeStars(matchRows){
+  const scored = [];
+
+  for (const r of matchRows || []){
+    const sp = toNumMaybe(r.sp);
+    if (sp == null) continue; // if no SP, skip (or you can set 0)
+
+    // Simple, predictable tiebreakers
+    const g  = toIntMaybe(r.g) ?? 0;
+    const a  = toIntMaybe(r.a) ?? 0;
+    const pts = g + a;
+
+    const sa = toIntMaybe(r.sa) ?? null;
+    const ga = toIntMaybe(r.ga) ?? null;
+    const saves = (sa != null && ga != null) ? (sa - ga) : null;
+
+    scored.push({
+      team_id: String(r.team_id ?? "").trim(),
+      player_name: String(r.player_name ?? "").trim(),
+      sp,
+      pts,
+      g,
+      saves: saves ?? -1
+    });
+  }
+
+  scored.sort((x, y) =>
+    (y.sp - x.sp) ||
+    (y.pts - x.pts) ||
+    (y.g - x.g) ||
+    (y.saves - x.saves) ||
+    x.player_name.localeCompare(y.player_name)
+  );
+
+  return scored.slice(0, 3);
+}
+
+function starGlyph(n){
+  if (n === 1) return `<span class="game-star star-gold">★</span>`;
+  if (n === 2) return `<span class="game-star star-silver">★</span>`;
+  if (n === 3) return `<span class="game-star star-bronze">★</span>`;
+  return "";
 }
 
 
