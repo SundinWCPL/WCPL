@@ -33,10 +33,16 @@ async function refresh() {
   const seasonId = getSeasonId();
   if (!seasonId) {
     setLoading(true, "No season found in seasons.csv.");
+    resetLeagueUI();
+    fantasyRows = [];
+    playersRows = [];
     return;
   }
 
   setLoading(true, `Loading ${seasonId}…`);
+  resetLeagueUI();            // NEW: clear old S2 UI immediately
+  fantasyRows = [];           // NEW: clear old data immediately
+  playersRows = [];           // NEW
 
   try {
     const fantasyPath = `../data/${seasonId}/fantasy.csv`;
@@ -52,6 +58,12 @@ async function refresh() {
     render();
   } catch (err) {
     console.error(err);
+
+    // NEW: ensure no stale S2 state leaks into S1
+    resetLeagueUI();
+    fantasyRows = [];
+    playersRows = [];
+
     setLoading(true, `No data exists for Season ${seasonId}.`);
     elTable.hidden = true;
   }
@@ -89,6 +101,11 @@ function buildLeagueOptions(rows) {
 }
 
 function render() {
+	 if (!fantasyRows.length || !playersRows.length || !leagueFilter) {
+    elTbody.innerHTML = "";
+    elTable.hidden = true;
+    return;
+  }
   const pmap = new Map();
   for (const p of playersRows) {
     const key = String(p.player_key ?? "").trim();
@@ -241,6 +258,12 @@ function setLoading(isLoading, msg = "") {
   elStatus.hidden = !isLoading;
   elStatus.textContent = msg;
   elTable.hidden = isLoading;
+}
+
+function resetLeagueUI() {
+  elLeagueWrap.hidden = true;
+  elLeagueSel.innerHTML = "";
+  leagueFilter = null;
 }
 
 function toNum(v) {
