@@ -238,6 +238,12 @@ if (isPlayoffs && played) {
 }
 
 setPageTitle(title);
+
+setupGameNavigation({
+  seasonId,
+  matchId,
+  stage
+});
   
   const resultEl = document.getElementById("resultLabel");
 
@@ -808,6 +814,13 @@ function applyTeamCardTheme(cardEl, team) {
 }
 
 function setPageTitle(text){
+  const el = document.getElementById("boxscoreTitleText");
+  if (el) {
+    el.textContent = text;     // only updates the center text, keeps arrows
+    return;
+  }
+
+  // fallback (if the span doesn't exist for some reason)
   const h1 = document.querySelector("main h1");
   if (h1) h1.textContent = text;
 }
@@ -1188,4 +1201,41 @@ function starGlyph(n){
   return "";
 }
 
+function setupGameNavigation({ seasonId, matchId, stage }) {
+  const prevBtn = document.getElementById("prevGameBtn");
+  const nextBtn = document.getElementById("nextGameBtn");
+
+  if (!prevBtn || !nextBtn) return;
+
+  const currentNum = parseGameNum(matchId);
+  const base = seriesKey(matchId);
+  const maxGames = seriesMaxGames(stage);
+
+  const makeUrl = (num) =>
+    `boxscore.html?season=${encodeURIComponent(seasonId)}&match_id=${encodeURIComponent(`${base}-G${num}`)}`;
+
+  // Reset
+  prevBtn.classList.remove("disabled");
+  nextBtn.classList.remove("disabled");
+
+  // Previous
+  if (currentNum > 1) {
+    prevBtn.onclick = () => {
+      location.href = makeUrl(currentNum - 1);
+    };
+  } else {
+    prevBtn.classList.add("disabled");
+    prevBtn.onclick = null;
+  }
+
+  // Next
+  if (currentNum < maxGames) {
+    nextBtn.onclick = () => {
+      location.href = makeUrl(currentNum + 1);
+    };
+  } else {
+    nextBtn.classList.add("disabled");
+    nextBtn.onclick = null;
+  }
+}
 
