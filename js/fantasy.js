@@ -233,18 +233,22 @@ function computeFantasyPointsFromPlayerRow(p) {
 
   if (!isGoalieRow(p)) return sk;
 
-  // Goalie: estimate saves from body_sv + stick_sv (players.csv has those)
-  const saves = toNum(p.body_sv) + toNum(p.stick_sv);
-  const ga = toNum(p.ga);
-  const shutout = (ga === 0 && toNum(p.gp_g) > 0) ? 50 : 0;
+  // --- Goalie scoring ---
+const sa = toNum(p.sa);
+const ga = toNum(p.ga);
+const saves = Math.max(0, sa - ga);
 
-  return (
-    saves * 10 +
-    shutout +
-    toNum(p.passes) * 2.5 +
-    toNum(p.g) * 65 +
-    toNum(p.a) * 30
-  );
+const shutouts = toNum(p.so);   // per-shutout
+const wins = toNum(p.wins) || toNum(p.w) || 0;
+
+return (
+  saves * 10 +
+  shutouts * 50 +
+  wins * 50 +
+  toNum(p.passes) * 2.5 +
+  toNum(p.g) * 65 +
+  toNum(p.a) * 30
+);
 }
 
 function fmtPts(x) {
