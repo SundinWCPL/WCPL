@@ -33,7 +33,11 @@
   </header>
 
   <main class="page">
-    <h1>Boxscore</h1>
+    <h1 class="boxscore-title">
+  <button id="prevGameBtn" class="nav-arrow" aria-label="Previous Game">◀</button>
+  <span id="boxscoreTitleText">Boxscore</span>
+  <button id="nextGameBtn" class="nav-arrow" aria-label="Next Game">▶</button>
+</h1>
 
     <div id="status" class="status">Loading…</div>
 
@@ -150,6 +154,6 @@
     </section>
   </main>
 <script src="https://cdn.plot.ly/plotly-2.30.0.min.js"></script>
-  <script type="module" src="../js/boxscore.js?v=3"></script>
+  <script type="module" src="../js/boxscore.js?v=4"></script>
 </body>
 </html>
