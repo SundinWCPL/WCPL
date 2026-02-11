@@ -390,3 +390,34 @@ body.boxscore-page .scorebar{
 .subhead.center {
   text-align: center;
 }
+
+/* ===============================
+   Game Navigation Arrows
+   =============================== */
+
+.boxscore-title{
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+}
+
+.nav-arrow{
+  background: none;
+  border: none;
+  font-size: 28px;
+  font-weight: 900;
+  cursor: pointer;
+  color: #d7dde6;
+  transition: opacity 0.2s ease, transform 0.15s ease;
+}
+
+.nav-arrow:hover:not(.disabled){
+  transform: scale(1.15);
+}
+
+.nav-arrow.disabled{
+  opacity: 0.25;
+  cursor: default;
+  pointer-events: none;
+}
