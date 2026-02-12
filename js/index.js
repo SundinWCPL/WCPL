@@ -681,15 +681,17 @@ function renderStandings(seasonId) {
     const team_id = String(t.team_id ?? "").trim();
     if (!team_id) continue;
 
-    tmap.set(team_id, {
-      team_id,
-      team_name: String(t.team_name ?? "").trim(),
-      conference: String(t.conference ?? "").trim() || "Conference",
-      bg_color: String(t.bg_color ?? "").trim(),
-      text_color: String(t.text_color ?? "").trim(),
-      GP: 0, W: 0, OTW: 0, OTL: 0, L: 0, PTS: 0,
-      GF: 0, GA: 0,
-    });
+tmap.set(team_id, {
+  team_id,
+  team_name: String(t.team_name ?? "").trim(),
+  conference: String(t.conference ?? "").trim() || "Conference",
+  bg_color: String(t.bg_color ?? "").trim(),
+  text_color: String(t.text_color ?? "").trim(),
+
+  GP: 0, W: 0, OTW: 0, OTL: 0, L: 0, PTS: 0,
+  GF: 0, GA: 0,
+  ShF: 0, ShA: 0
+});
   }
 
   // Compute standings (regular season only)
@@ -714,6 +716,18 @@ function renderStandings(seasonId) {
     homeRow.GP++; awayRow.GP++;
     homeRow.GF += hg; homeRow.GA += ag;
     awayRow.GF += ag; awayRow.GA += hg;
+	
+	const hShots = toIntMaybe(g.home_shots);
+const aShots = toIntMaybe(g.away_shots);
+
+if (hShots !== null) {
+  homeRow.ShF += hShots;
+  awayRow.ShA += hShots;
+}
+if (aShots !== null) {
+  awayRow.ShF += aShots;
+  homeRow.ShA += aShots;
+}
 
     const isOT = ot > 0;
     const homeWin = hg > ag;
@@ -789,64 +803,96 @@ document.querySelector(".home-two")?.classList.toggle("two-conf", isTwoConf);
     const table = document.createElement("table");
     table.className = "data-table";
     table.innerHTML = `
-      <thead>
-        <tr>
-		  <th></th>
-          <th class="left">Team</th>
-          <th class="num">GP</th>
-          <th class="num">W</th>
-          <th class="num">OTW</th>
-          <th class="num">OTL</th>
-          <th class="num">L</th>
-          <th class="num">PTS</th>
-          <th class="num">GDiff</th>
-        </tr>
-      </thead>
+<thead>
+  <tr>
+    <th></th>
+    <th class="left">Team</th>
+    <th class="num">GP</th>
+    <th class="num">W</th>
+    <th class="num">OTW</th>
+    <th class="num">OTL</th>
+    <th class="num">L</th>
+    <th class="num">PTS</th>
+    <th class="num">GF</th>
+    <th class="num">GA</th>
+    <th class="num">GDiff</th>
+    <th class="num">ShF</th>
+    <th class="num">ShA</th>
+    <th class="num">Sh%</th>
+    <th class="num">Sv%</th>
+  </tr>
+</thead>
       <tbody></tbody>
     `;
 
     const tbody = table.querySelector("tbody");
 
-    for (const r of rows) {
-      const tr = document.createElement("tr");
+    rows.forEach((r, idx) => {
+  const tr = document.createElement("tr");
 
-      // Logo
-      const tdLogo = document.createElement("td");
-      tdLogo.className = "logo-cell";
-      if (r.bg_color) tdLogo.style.backgroundColor = r.bg_color;
+  // Logo
+  const tdLogo = document.createElement("td");
+  tdLogo.className = "logo-cell";
+  if (r.bg_color) tdLogo.style.backgroundColor = r.bg_color;
 
-      const img = document.createElement("img");
-      img.className = "logo";
-      img.loading = "lazy";
-      img.alt = `${r.team_id} logo`;
-      img.src = `logos/${seasonId}/${r.team_id}.png`;
-      img.onerror = () => (img.style.visibility = "hidden");
-      tdLogo.appendChild(img);
-      tr.appendChild(tdLogo);
+  const img = document.createElement("img");
+  img.className = "logo";
+  img.loading = "lazy";
+  img.alt = `${r.team_id} logo`;
+  img.src = `logos/${seasonId}/${r.team_id}.png`;
+  img.onerror = () => (img.style.visibility = "hidden");
+  tdLogo.appendChild(img);
+  tr.appendChild(tdLogo);
 
-      // Team link
-      const tdTeam = document.createElement("td");
-      const a = document.createElement("a");
-      a.className = "team-link";
-      a.href = `pages/team.html?season=${encodeURIComponent(seasonId)}&team_id=${encodeURIComponent(r.team_id)}`;
-      a.textContent = r.team_name || r.team_id;
-      tdTeam.appendChild(a);
-      tr.appendChild(tdTeam);
-      tr.appendChild(tdNum(r.GP));
-      tr.appendChild(tdNum(r.W));
-      tr.appendChild(tdNum(r.OTW));
-      tr.appendChild(tdNum(r.OTL));
-      tr.appendChild(tdNum(r.L));
-      tr.appendChild(tdNum(r.PTS));
+  // Team link
+  const tdTeam = document.createElement("td");
+  const a = document.createElement("a");
+  a.className = "team-link";
+  a.href = `pages/team.html?season=${encodeURIComponent(seasonId)}&team_id=${encodeURIComponent(r.team_id)}`;
+  a.textContent = r.team_name || r.team_id;
+  tdTeam.appendChild(a);
+  tr.appendChild(tdTeam);
 
-      // GDiff with + for positive
-      const tdDiff = document.createElement("td");
-      tdDiff.className = "num";
-      tdDiff.textContent = (r.DIFF > 0) ? `+${r.DIFF}` : String(r.DIFF);
-      tr.appendChild(tdDiff);
+  tr.appendChild(tdNum(r.GP));
+  tr.appendChild(tdNum(r.W));
+  tr.appendChild(tdNum(r.OTW));
+  tr.appendChild(tdNum(r.OTL));
+  tr.appendChild(tdNum(r.L));
+  tr.appendChild(tdNum(r.PTS));
+  tr.appendChild(tdNum(r.GF));
+  tr.appendChild(tdNum(r.GA));
 
-      tbody.appendChild(tr);
-    }
+
+  const tdDiff = document.createElement("td");
+  tdDiff.className = "num";
+  tdDiff.textContent = (r.DIFF > 0) ? `+${r.DIFF}` : String(r.DIFF);
+  tr.appendChild(tdDiff);
+  
+  tr.appendChild(tdNum(r.ShF));
+tr.appendChild(tdNum(r.ShA));
+
+const shPct = r.ShF > 0 ? (r.GF / r.ShF) * 100 : null;
+const svPct = r.ShA > 0 ? (1 - (r.GA / r.ShA)) * 100 : null;
+
+tr.appendChild(tdPctText(shPct, 1));
+tr.appendChild(tdPctText(svPct, 1));
+
+  tbody.appendChild(tr);
+
+  // 🔥 Add playoff cutoff line after 6th place (idx = 5)
+if (rows.length === 9 && idx === 5) {
+  const cutoff = document.createElement("tr");
+  cutoff.className = "playoff-cutoff-row";
+
+  const td = document.createElement("td");
+  td.colSpan = 15;
+  td.className = "playoff-cutoff-cell";
+
+  cutoff.appendChild(td);
+  tbody.appendChild(cutoff);
+}
+
+});
 
     tw.appendChild(table);
     block.appendChild(tw);

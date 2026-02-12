@@ -14,6 +14,9 @@ const elTable = document.getElementById("playersTable");
 const elTbody = elTable.querySelector("tbody");
 const elThead = elTable.querySelector("thead");
 
+const elRateMode = document.getElementById("rateMode");
+
+
 let advOn = false;
 
 let seasons = [];
@@ -47,6 +50,7 @@ elStage.addEventListener("change", () => {
   elTeam.addEventListener("change", render);
   elConf.addEventListener("change", render);
   elMinGP.addEventListener("input", render);
+  elRateMode?.addEventListener("change", render);
 
   // Click-to-sort on headers
   elThead.addEventListener("click", (e) => {
@@ -211,6 +215,7 @@ function render() {
   const teamId = elTeam.value;       // "__ALL__" or team_id
   const conf = elConf.value;         // "__ALL__" or conference name
   const minGP = Math.max(0, parseInt(elMinGP.value || "0", 10) || 0);
+  const rateMode = elRateMode?.value || "TOTAL"; // "TOTAL" | "P15"
 
   const teamById = new Map(teams.map(t => [String(t.team_id ?? "").trim(), t]));
 
@@ -256,16 +261,22 @@ function render() {
 const gp_s = toIntMaybe(p.gp_s) ?? 0;
 const pts  = toIntMaybe(p.pts) ?? 0;
 
-const ppgCsv = toNumMaybe(p.p_per_gp);
-const ppg = (ppgCsv != null && Number.isFinite(ppgCsv))
-  ? ppgCsv
-  : perGpNormalized(pts, p, "SKATER", advOn);
-
 const sp = toNumMaybe(p.sp);
-const spgCsv = toNumMaybe(p.sp_per_gp);
-const spg = (spgCsv != null && Number.isFinite(spgCsv))
-  ? spgCsv
-  : perGpNormalized(sp, p, "SKATER", advOn);
+
+const ptsDisp  = valueMaybePer15(pts, p, "SKATER", advOn, rateMode);
+const shotsDisp= valueMaybePer15(shots, p, "SKATER", advOn, rateMode);
+const hitsDisp = valueMaybePer15(toIntMaybe(p.hits), p, "SKATER", advOn, rateMode);
+const taDisp   = valueMaybePer15(toIntMaybe(p.takeaways), p, "SKATER", advOn, rateMode);
+const toDisp   = valueMaybePer15(toIntMaybe(p.turnovers), p, "SKATER", advOn, rateMode);
+const spDisp   = valueMaybePer15(sp, p, "SKATER", advOn, rateMode);
+const possSeconds = toNumMaybe(p.possession_s);
+const possMinutes = (possSeconds != null) ? possSeconds / 60 : null;
+
+// Totals = minutes
+// Per 15 = seconds per 15 (normalized)
+const possDisp = (rateMode === "P15")
+  ? valueMaybePer15(possSeconds, p, "SKATER", advOn, rateMode)
+  : possMinutes;
 
     // Goalie stats
     const gp_g = toIntMaybe(p.gp_g) ?? 0;
@@ -285,15 +296,22 @@ const spg = (spgCsv != null && Number.isFinite(spgCsv))
       gp_s,
       g,
       a: toIntMaybe(p.a) ?? 0,
-      pts,
-      ppg,
-      shots: (shots !== null ? Math.trunc(shots) : null),
-      shRate,
+pts,
+ptsDisp,
+shots: (shots !== null ? Math.trunc(shots) : null),
+shotsDisp,
+shRate,
 
-      // adv (skater)
-      hits: toIntMaybe(p.hits),
-      ta: toIntMaybe(p.takeaways),
-      to: toIntMaybe(p.turnovers),
+hits: toIntMaybe(p.hits),
+hitsDisp,
+ta: toIntMaybe(p.takeaways),
+taDisp,
+to: toIntMaybe(p.turnovers),
+toDisp,
+possDisp,
+
+sp,
+spDisp,
 
       // goalie
       gp_g,
@@ -307,7 +325,6 @@ const spg = (spgCsv != null && Number.isFinite(spgCsv))
 
       // star points (shown in both modes)
       sp,
-      spg,
 
       team: teamById.get((p.team_id ?? "").trim()),
     };
@@ -382,26 +399,25 @@ const spg = (spgCsv != null && Number.isFinite(spgCsv))
       tr.appendChild(tdNumMaybe(r.w));
       tr.appendChild(tdNumMaybe(r.so));
       tr.appendChild(tdNumMaybe(r.sp, 1));
-      tr.appendChild(tdNumMaybe(r.spg, 2));
-    } else {
-tr.appendChild(tdNum(r.gp_s));
-tr.appendChild(tdNum(r.g));
-tr.appendChild(tdNum(r.a));
-tr.appendChild(tdNum(r.pts));
-tr.appendChild(tdNumMaybe(r.ppg, 2));
-tr.appendChild(tdNumMaybe(r.shots));
-tr.appendChild(tdPctMaybe(r.shRate !== null ? r.shRate * 100 : null, 1));
+} else {
+  tr.appendChild(tdNum(r.gp_s));
+  tr.appendChild(tdNum(r.g));
+  tr.appendChild(tdNum(r.a));
+const isPer15 = rateMode === "P15";
 
-if (advOn) {
-  tr.appendChild(tdNumMaybe(r.hits, null, true));
-  tr.appendChild(tdNumMaybe(r.ta, null, true));
-  tr.appendChild(tdNumMaybe(r.to, null, true));
+tr.appendChild(tdNumMaybe(r.ptsDisp, isPer15 ? 2 : null));
+tr.appendChild(tdNumMaybe(r.shotsDisp, isPer15 ? 2 : null));
+  tr.appendChild(tdPctMaybe(r.shRate !== null ? r.shRate * 100 : null, 1));
+
+  if (advOn) {
+tr.appendChild(tdNumMaybe(r.hitsDisp, isPer15 ? 2 : null, true));
+tr.appendChild(tdNumMaybe(r.taDisp,   isPer15 ? 2 : null, true));
+tr.appendChild(tdNumMaybe(r.toDisp,   isPer15 ? 2 : null, true));
+tr.appendChild(tdNumMaybe(r.possDisp, isPer15 ? 1 : 1, true));
+  }
+
+tr.appendChild(tdNumMaybe(r.spDisp, isPer15 ? 2 : 1));
 }
-
-// SP columns at the very end
-tr.appendChild(tdNumMaybe(r.sp, 1));
-tr.appendChild(tdNumMaybe(r.spg, 2));
-    }
 
     elTbody.appendChild(tr);
   }
@@ -414,9 +430,10 @@ function isSortKeyAllowedForMode(key, mode) {
   if (!key) return false;
 
   if (mode === "GOALIE") {
-    return ["GPG", "SA", "GA", "SV", "SVP", "GAA", "W", "SO", "SP", "SPPG"].includes(key);
+    return ["GPG", "SA", "GA", "SV", "SVP", "GAA", "W", "SO", "SP"].includes(key);
   }
-  return ["GPS", "G", "A", "PTS", "PPG", "S", "SH", "SP", "SPPG"].includes(key);
+
+  return ["GPS", "G", "A", "PTS", "S", "SH", "HIT", "TA", "TO", "POSS", "SP"].includes(key);
 }
 
 function compareByKey(a, b, key, dir, mode) {
@@ -454,24 +471,32 @@ function getSortValue(r, key, mode) {
       case "W":   return (r.w == null ? null : r.w);
       case "SO":  return (r.so == null ? null : r.so);
       case "SP":  return (r.sp == null ? null : r.sp);
-      case "SPPG":return (r.spg == null ? null : r.spg);
       default:    return null;
     }
   }
 
-  // SKATER
-  switch (key) {
-    case "GPS": return r.gp_s ?? 0;
-    case "G":   return r.g ?? 0;
-    case "A":   return r.a ?? 0;
-    case "PTS": return r.pts ?? 0;
-    case "PPG": return (r.ppg == null ? null : r.ppg);
-    case "S":   return (r.shots == null ? null : r.shots);
-    case "SH":  return (r.shRate == null ? null : r.shRate); // 0-1
-	case "SP":  return (r.sp == null ? null : r.sp);
-    case "SPPG":return (r.spg == null ? null : r.spg);
-    default:    return null;
-  }
+// SKATER
+switch (key) {
+  case "GPS":  return r.gp_s ?? 0;
+  case "G":    return r.g ?? 0;
+  case "A":    return r.a ?? 0;
+
+  // Sort by displayed value (Totals or Per15)
+  case "PTS":  return (r.ptsDisp == null ? null : r.ptsDisp);
+  case "S":    return (r.shotsDisp == null ? null : r.shotsDisp);
+
+  // still a rate
+  case "SH":   return (r.shRate == null ? null : r.shRate);
+
+  // Sort by displayed adv values
+  case "HIT":  return (r.hitsDisp == null ? null : r.hitsDisp);
+  case "TA":   return (r.taDisp   == null ? null : r.taDisp);
+  case "TO":   return (r.toDisp   == null ? null : r.toDisp);
+  case "POSS": return (r.possDisp == null ? null : r.possDisp);
+
+  case "SP":   return (r.spDisp == null ? null : r.spDisp);
+  default:     return null;
+}
 }
 
 function updateSortIndicators() {
@@ -562,7 +587,6 @@ function renderHeader(mode, advOn) {
       { label: "W", cls: "num", key: "W" },
       { label: "SO", cls: "num", key: "SO" },
       { label: "SP", cls: "num", key: "SP" },
-      { label: "SP/GP", cls: "num", key: "SPPG" },
     );
   } else {
     cols.push(
@@ -570,23 +594,26 @@ function renderHeader(mode, advOn) {
   { label: "G", cls: "num", key: "G" },
   { label: "A", cls: "num", key: "A" },
   { label: "PTS", cls: "num", key: "PTS" },
-  { label: "P/GP", cls: "num", key: "PPG" },
   { label: "S", cls: "num", key: "S" },
   { label: "SH%", cls: "num", key: "SH" },
 );
 
 if (advOn) {
-  cols.push(
-    { label: "HIT", cls: "num adv" },
-    { label: "TA", cls: "num adv" },
-    { label: "TO", cls: "num adv" },
-  );
+cols.push(
+  { label: "HIT", cls: "num adv", key: "HIT" },
+  { label: "TA",  cls: "num adv", key: "TA"  },
+  { label: "TO",  cls: "num adv", key: "TO"  },
+  {
+  label: (elRateMode?.value === "P15") ? "Poss (s)" : "Poss (m)",
+  cls: "num adv",
+  key: "POSS"
+},
+);
 }
 
 // SP columns always at the very end
 cols.push(
   { label: "SP", cls: "num", key: "SP" },
-  { label: "SP/GP", cls: "num", key: "SPPG" },
 );
   }
 
@@ -602,6 +629,14 @@ cols.push(
   elThead.innerHTML = "";
   elThead.appendChild(tr);
 }
+function valueMaybePer15(total, rawRow, scope, advOn, rateMode){
+  if (total == null) return null;
+  if (rateMode !== "P15") return total;
+  if (!advOn) return total;
+
+  return perGpNormalized(total, rawRow, scope, true);
+}
+
 function perGpNormalized(total, row, scope, advStatsOn){
   const x = toNumMaybe(total);
   if (x == null) return null;

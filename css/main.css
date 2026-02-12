@@ -279,3 +279,10 @@ body.team-page .card .data-table th,
 body.team-page .card .data-table td{
   color: inherit;
 }
+
+/* Override wide default for Min GP */
+#minGP {
+  min-width: 0;      /* remove the 260px floor */
+  width: 70px;
+  flex: 0 0 70px;    /* prevent flex growth */
+}

@@ -620,3 +620,81 @@
   display: flex;
   align-items: stretch;
 }
+/* =========================
+   DENSER HOME STANDINGS
+   ========================= */
+
+/* Reduce shell vertical spacing slightly */
+.home-page .home-shell{
+  gap: 10px; /* was 14px */
+}
+
+/* Tighten home section spacing */
+.home-section { 
+  margin: 12px 0; /* was 18px */
+}
+
+/* Compact standings table rows */
+.home-page .data-table th,
+.home-page .data-table td{
+  padding-top: 6px;   /* was 9px */
+  padding-bottom: 6px;
+}
+
+/* Make standings logos smaller */
+.home-page .logo-cell .logo{
+  width: 40px;  /* was 52px */
+  height: 40px;
+}
+
+/* Reduce logo cell padding */
+.home-page td.logo-cell{
+  padding: 0px;
+}
+
+/* Slightly tighten card padding */
+.home-page .card{
+  padding: 12px 14px; /* if defined elsewhere larger */
+}
+
+/* Reduce standings header spacing */
+.home-page .standings-mini-title{
+  margin: 0 0 6px;
+}
+/* =========================
+   Playoff Cutoff Line
+   ========================= */
+
+.playoff-cutoff-row td {
+  padding: 6px 0;
+  border: none !important;
+  background: transparent;
+}
+
+.playoff-cutoff-cell {
+  text-align: center;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 1px;
+  opacity: 0.65;
+  border-top: 2px solid #d4af37; /* gold accent */
+  padding-top: 8px;
+}
+/* =========================
+   Playoff Cutoff Divider
+   ========================= */
+
+.playoff-cutoff-row td{
+  padding: 0;
+  height: 10px;
+  border: none !important;
+
+  background: linear-gradient(
+    to bottom,
+    transparent 0%,
+    rgba(58, 79, 143, 0.95) 50%,
+    transparent 100%
+  );
+}
+
+
