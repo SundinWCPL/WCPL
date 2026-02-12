@@ -597,6 +597,7 @@ function importOneMatch({ seasonId, matchId, dataRoot, apply }) {
   const boxRowsNew = [];
   for (const jp of jsonPlayers) {
     const teamColor = String(jp.team ?? "").toLowerCase(); // "red"/"blue"
+	if (teamColor !== "red" && teamColor !== "blue") continue;
     const team_id = (teamColor === "red") ? sched.home_team_id : (teamColor === "blue" ? sched.away_team_id : "");
 
     const pos = String(jp.position ?? "");
