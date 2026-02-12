@@ -391,33 +391,39 @@ body.boxscore-page .scorebar{
   text-align: center;
 }
 
-/* ===============================
-   Game Navigation Arrows
-   =============================== */
-
 .boxscore-title{
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 24px;
+  gap: 18px;
 }
 
-.nav-arrow{
-  background: none;
+/* icon-only nav arrows */
+.game-nav-btn{
+  background: transparent;
   border: none;
-  font-size: 28px;
+  padding: 0;
+  margin: 0;
+
+  color: #e7e7e7;
+  font-size: 22px;
   font-weight: 900;
+  line-height: 1;
   cursor: pointer;
-  color: #d7dde6;
-  transition: opacity 0.2s ease, transform 0.15s ease;
+
+  opacity: 0.85;
+  transform: translateY(-1px);
 }
 
-.nav-arrow:hover:not(.disabled){
-  transform: scale(1.15);
+.game-nav-btn:hover{
+  opacity: 1;
+  filter: drop-shadow(0 6px 10px rgba(0,0,0,0.35));
 }
 
-.nav-arrow.disabled{
+.game-nav-btn.disabled{
   opacity: 0.25;
   cursor: default;
   pointer-events: none;
+  filter: none;
 }
+

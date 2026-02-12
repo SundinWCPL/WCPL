@@ -17,6 +17,12 @@ const elAwaySummaryTitle = document.getElementById("awaySummaryTitle");
 const elPreviewRosters = document.getElementById("previewRosters");
 const elPlayedBoxscore = document.getElementById("playedBoxscore");
 
+// Speed display multiplier
+// 2.23694 = m/s → mph
+// 3.6     = m/s → km/h
+const SPEED_MULT = 2.23694;
+const SPEED_UNIT = "mph";
+
 let playerMaps = { bySteam: null, byName: null };
 
 const T = {
@@ -238,13 +244,13 @@ if (isPlayoffs && played) {
 }
 
 setPageTitle(title);
-
-setupGameNavigation({
+  
+  setupGameNavigation({
   seasonId,
   matchId,
   stage
 });
-  
+
   const resultEl = document.getElementById("resultLabel");
 
 let resultText = "PREVIEW";
@@ -490,6 +496,7 @@ stars.forEach((s, i) => {
     seasonId,
     teamLabel: displayTeamName(awayTeam)
   });
+  
 
   T.homeGameSkaters.hidden = false;
   T.homeGameGoalies.hidden = false;
@@ -814,13 +821,13 @@ function applyTeamCardTheme(cardEl, team) {
 }
 
 function setPageTitle(text){
-  const el = document.getElementById("boxscoreTitleText");
-  if (el) {
-    el.textContent = text;     // only updates the center text, keeps arrows
+  const titleText = document.getElementById("boxscoreTitleText");
+  if (titleText) {
+    titleText.textContent = text;
     return;
   }
 
-  // fallback (if the span doesn't exist for some reason)
+  // fallback (older HTML)
   const h1 = document.querySelector("main h1");
   if (h1) h1.textContent = text;
 }
@@ -958,19 +965,21 @@ function parseShotSummary(summary) {
   const s = String(summary ?? "").trim();
   if (!s) return [];
 
-  // Format per event:
-  // P{period} mm:ss|Team|SteamID|shotType|speed|x|z|result
+  // New format per event:
+  // t|Team|SteamID|shotKind|shotType|contactV|contactY|x|z|result
   return s.split(";").map(part => {
     const fields = part.split("|");
     return {
-      t: fields[0] ?? "",
-      teamColor: fields[1] ?? "",      // "Red" / "Blue"
+      t: fields[0] ?? "",                // e.g., "P1 - 3:24"
+      teamColor: fields[1] ?? "",        // "Red" / "Blue"
       steamId: fields[2] ?? "",
-      shotType: fields[3] ?? "",
-      speed: toNumMaybe(fields[4]),
-      x: toNumMaybe(fields[5]),
-      z: toNumMaybe(fields[6]),
-      result: fields[7] ?? ""          // "G" or "S"
+      shotKind: fields[3] ?? "",         // "shot" / "bat"starGlyph
+      shotType: fields[4] ?? "",         // "shot" / "one_timer" / etc
+      contactV: toNumMaybe(fields[5]),   // PuckVelocity from save/goal row
+      contactY: toNumMaybe(fields[6]),   // yCoord from save/goal row
+      x: toNumMaybe(fields[7]),
+      z: toNumMaybe(fields[8]),
+      result: fields[9] ?? ""            // "G" or "S"
     };
   }).filter(e => Number.isFinite(e.x) && Number.isFinite(e.z));
 }
@@ -1047,25 +1056,54 @@ const nameFromSteam = (steamId) => {
     x: arr.map(e => e.x),
     y: arr.map(e => e.z),
     customdata: arr.map(e => {
-      const player = nameFromSteam(e.steamId) || `Unknown (${e.steamId || "?"})`;
-      const dist = distToNet(e.x, e.z);
-      return [
-        player,
-        String(e.t || "").replace(/^P\d+\s*/i, ""),
-        Number.isFinite(dist) ? dist.toFixed(1) : "",
-        String(e.shotType || "")
-  .replace(/_/g, " ")
-  .replace(/^./, c => c.toUpperCase()),
-        (e.speed != null && Number.isFinite(e.speed)) ? (e.speed * 3.6).toFixed(1) : ""
-      ];
-    }),
-    hovertemplate:
-      "<b>%{customdata[0]}</b><br>" +
-      "%{customdata[1]}<br>" +
-      "Distance: %{customdata[2]} m<br>" +
-      "Type: %{customdata[3]}<br>" +
-      "Speed: %{customdata[4]} km/h<br>" +
-      "<extra></extra>",
+  const player = nameFromSteam(e.steamId) || `Unknown (${e.steamId || "?"})`;
+  const dist = distToNet(e.x, e.z);
+
+  let shotTypePretty = String(e.shotType || "");
+
+if (shotTypePretty === "wrap_bank") {
+  shotTypePretty = "Wrap/Bank";
+} else {
+  shotTypePretty = shotTypePretty
+    .replace(/_/g, " ")
+    .replace(/^./, c => c.toUpperCase());
+}
+
+
+  // Optional: prefix Bat shots
+let typeLine = shotTypePretty;
+
+if (String(e.shotKind || "").toLowerCase() === "bat") {
+  typeLine = "Bat/Tip";
+}
+
+const contactSpeed = (e.contactV != null && Number.isFinite(e.contactV))
+  ? (e.contactV * SPEED_MULT).toFixed(1)
+  : "";
+  const contactY = (e.contactY != null && Number.isFinite(e.contactY)) ? e.contactY.toFixed(2) : "";
+
+  const atLabel = (String(e.result || "").toUpperCase() === "G")
+    ? "At Goal Line"
+    : "At Save";
+
+  return [
+  player,
+  String(e.t || ""),
+  Number.isFinite(dist) ? dist.toFixed(1) : "",
+  typeLine,
+  atLabel,
+  contactSpeed,
+  contactY
+];
+}),
+hovertemplate:
+  "<b>%{customdata[0]}</b><br>" +
+  "%{customdata[1]}<br>" +
+  "Distance: %{customdata[2]} m<br>" +
+  "Type: %{customdata[3]}<br>" +
+  "Speed (%{customdata[4]}): %{customdata[5]} " + SPEED_UNIT + "<br>" +
+  "Puck Height (%{customdata[4]}): %{customdata[6]} m<br>" +
+  "<extra></extra>",
     marker
   });
 
@@ -1204,7 +1242,6 @@ function starGlyph(n){
 function setupGameNavigation({ seasonId, matchId, stage }) {
   const prevBtn = document.getElementById("prevGameBtn");
   const nextBtn = document.getElementById("nextGameBtn");
-
   if (!prevBtn || !nextBtn) return;
 
   const currentNum = parseGameNum(matchId);
@@ -1214,28 +1251,22 @@ function setupGameNavigation({ seasonId, matchId, stage }) {
   const makeUrl = (num) =>
     `boxscore.html?season=${encodeURIComponent(seasonId)}&match_id=${encodeURIComponent(`${base}-G${num}`)}`;
 
-  // Reset
   prevBtn.classList.remove("disabled");
   nextBtn.classList.remove("disabled");
 
-  // Previous
   if (currentNum > 1) {
-    prevBtn.onclick = () => {
-      location.href = makeUrl(currentNum - 1);
-    };
+    prevBtn.onclick = () => location.href = makeUrl(currentNum - 1);
   } else {
     prevBtn.classList.add("disabled");
     prevBtn.onclick = null;
   }
 
-  // Next
   if (currentNum < maxGames) {
-    nextBtn.onclick = () => {
-      location.href = makeUrl(currentNum + 1);
-    };
+    nextBtn.onclick = () => location.href = makeUrl(currentNum + 1);
   } else {
     nextBtn.classList.add("disabled");
     nextBtn.onclick = null;
   }
 }
+
 

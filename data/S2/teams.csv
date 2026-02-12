@@ -1,5 +1,5 @@
 team_id,team_name,conference,bg_color,text_color,notes
-CG67,Carl's Green 67s,Katsyoro Conference,#FFFFFF,#02702A,
+CG67,Carl's Green 67s,The Basement,#FFFFFF,#02702A,
 PP,Poro's Puffles,Katsyoro Conference,#4442FF,#FFFF00,
 BRG,The Bourgeoisie,Katsyoro Conference,#000000,#FFD700,
 MOFO,Mother Puckers,The Basement,#F42B84,#46FF31,
@@ -7,4 +7,4 @@ LBR,Long Beach Riptide,Katsyoro Conference,#59A3A4,#F02230,
 RR,Racy Reindeer,Katsyoro Conference,#673435,#FFFFFF,
 BB,Boston Barts,Katsyoro Conference,#F4D331,#CA1723,
 FOX,Fernie Foxes,The Basement,#E5812A,#000000,
-TOR,Toronto Badgers,The Basement,#B50A30,#000000,
+TOR,Toronto Badgers,Katsyoro Conference,#B50A30,#000000,
