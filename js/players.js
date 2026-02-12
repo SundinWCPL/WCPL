@@ -174,7 +174,10 @@ function buildTeamOptions(teamRows) {
   }
 
   const current = elTeam.value || "__ALL__";
-  elTeam.innerHTML = `<option value="__ALL__">All</option>`;
+  elTeam.innerHTML = `
+  <option value="__ALL__">All</option>
+  <option value="FREE_AGENT">Free Agents</option>
+`;
   [...opts]
     .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }))
     .forEach(id => {
@@ -244,9 +247,12 @@ function render() {
     );
   }
 
-  if (teamId !== "__ALL__") {
-    view = view.filter(p => String(p.team_id ?? "").trim() === teamId);
-  }
+if (teamId === "FREE_AGENT") {
+  // Players with blank team_id in players.csv
+  view = view.filter(p => String(p.team_id ?? "").trim() === "");
+} else if (teamId !== "__ALL__") {
+  view = view.filter(p => String(p.team_id ?? "").trim() === teamId);
+}
 
   // --- map/decorate ---
   const rows = view.map(p => {

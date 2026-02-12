@@ -127,7 +127,7 @@ function todayISO() {
 // -----------------------------
 const DEKE_LOOKBACK_S = 1.5;
 const DEKE_MIN_DX_M = 1.0;
-const DEKE_WITHIN_NET_M = 5.0;
+const DEKE_WITHIN_NET_M = 7.0;
 const ONE_TIMER_WINDOW_S = 1.0;
 const REBOUND_WINDOW_S = 1.5;
 const SHOT_RESULT_MAX_DT_S = 6.0;
@@ -179,8 +179,14 @@ for (let i = recentEvents.length - 1; i >= 0; i--) {
   }
 }
 
-  // Deke
-  const nearNet = (shotZ != null) && ((NET_Z - shotZ) <= DEKE_WITHIN_NET_M);
+  // Deke eligibility: true distance to net (x=0, z=NET_Z) must be within threshold
+let nearNet = false;
+if (shotX != null && shotZ != null) {
+  const dx = shotX;
+  const dz = NET_Z - shotZ;
+  const dist = Math.sqrt(dx * dx + dz * dz);
+  nearNet = dist <= DEKE_WITHIN_NET_M;
+}
   if (nearNet && shooterSteam) {
     for (let i = recentEvents.length - 1; i >= 0; i--) {
       const ev = recentEvents[i];
