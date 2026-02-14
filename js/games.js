@@ -462,21 +462,36 @@ function fallbackTeam(team_id) {
   return { team_id: id || "UNKNOWN", bg_color: "", text_color: "" };
 }
 
-function dateKey(s) {
-  const d = new Date((s ?? "").trim());
-  const t = d.getTime();
-  return Number.isFinite(t) ? t : Number.POSITIVE_INFINITY;
+function formatDate(s) {
+  const v = (s ?? "").trim();
+  if (!v) return "";
+
+  // Expect YYYY-MM-DD
+  const [yyyy, mm, dd] = v.split("-").map(Number);
+  if (!yyyy || !mm || !dd) return v;
+
+  const d = new Date(yyyy, mm - 1, dd); // LOCAL date constructor
+
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
 }
 
 function formatDate(s) {
   const v = (s ?? "").trim();
   if (!v) return "";
-  const d = new Date(v);
-  if (!Number.isFinite(d.getTime())) return v;
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
-  return `${yyyy}-${mm}-${dd}`;
+
+  // Expect YYYY-MM-DD
+  const [yyyy, mm, dd] = v.split("-").map(Number);
+  if (!yyyy || !mm || !dd) return v;
+
+  const d = new Date(yyyy, mm - 1, dd); // LOCAL date constructor
+
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
 }
 
 function setLoading(isLoading, msg = "") {
