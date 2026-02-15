@@ -15,27 +15,26 @@
   font-size: 14px;
 }
 #teamsTable .logo-cell .logo {
-    width: 60px;
-    height: 60px;
-  }
+  width: 60px;
+  height: 60px;
+}
 </style>
 <body>
   <header class="site-header">
     <a class="brand" href="../index.html">
-  <img
-    src="../assets/wcpl_logo.png"
-    alt="WCPL"
-    class="league-logo"
-  />
-</a>
-
+      <img
+        src="../assets/wcpl_logo.png"
+        alt="WCPL"
+        class="league-logo"
+      />
+    </a>
 
     <nav class="nav">
       <a class="active" href="teams.html">Teams</a>
       <a href="players.html">Players</a>
       <a href="games.html">Games</a>
-	  <a href="charts.html">Charts</a>
-	  <a href="fantasy.html">Fantasy</a>
+      <a href="charts.html">Charts</a>
+      <a href="fantasy.html">Fantasy</a>
     </nav>
 
     <div class="header-right">
@@ -56,16 +55,22 @@
           <option value="__ALL__">All</option>
         </select>
       </label>
-	  
-	  <label>
-  Stats
-  <select id="stageSelect">
-    <option value="REG">Regular Season</option>
-    <option value="PO">Playoffs</option>
-  </select>
-</label>
 
+      <label>
+        Stats
+        <select id="stageSelect">
+          <option value="REG">Regular Season</option>
+          <option value="PO">Playoffs</option>
+        </select>
+      </label>
 
+      <label class="control">
+        <span class="control-label">View</span>
+        <select id="rateMode">
+          <option value="TOTAL">Totals</option>
+          <option value="P15">Per 15</option>
+        </select>
+      </label>
     </section>
 
     <div id="status" class="status">Loading…</div>
@@ -74,37 +79,43 @@
       <table id="teamsTable" class="data-table" hidden>
         <thead>
           <tr>
-				<th></th>
-				<th class="left">Team</th>
-				<th class="num" data-key="GP">GP</th>
-				<th class="num" data-key="W">W</th>
-				<th class="num" data-key="OTW">OTW</th>
-				<th class="num" data-key="OTL">OTL</th>
-				<th class="num" data-key="L">L</th>
-				<th class="num" data-key="PTS">PTS</th>
-				<th class="num" data-key="GF">GF</th>
-				<th class="num" data-key="GA">GA</th>
-				<th class="num" data-key="GDIFF">GDIFF</th>
-				<th class="num" data-key="SF">SF</th>
-				<th class="num" data-key="SA">SA</th>
-				<th class="num" data-key="SH">SH%</th>
-				<th class="num" data-key="SV">SV%</th>
-				<th class="num" data-key="PDO">PDO</th>
-				<th class="num" data-key="GFPG">GF/G</th>
-				<th class="num" data-key="GAPG">GA/G</th>
-				<th class="num" data-key="SFPG">SF/G</th>
-				<th class="num" data-key="SAPG">SA/G</th>
+            <th></th>
+            <th class="left">Team</th>
+
+            <th class="num" data-key="GP">GP</th>
+            <th class="num" data-key="W">W</th>
+            <th class="num" data-key="OTW">OTW</th>
+            <th class="num" data-key="OTL">OTL</th>
+            <th class="num" data-key="L">L</th>
+            <th class="num" data-key="PTS">PTS</th>
+
+            <th class="num" data-key="GDIFF">GDIFF</th>
+            <th class="num" data-key="SH">SH%</th>
+            <th class="num" data-key="SV">SV%</th>
+
+            <th class="num" data-key="PDO">PDO</th>
+
+            <th class="num" data-key="GF">GF</th>
+            <th class="num" data-key="GA">GA</th>
+            <th class="num" data-key="SF">SF</th>
+            <th class="num" data-key="SA">SA</th>
+
+            <th class="num" data-key="XG">xG</th>
+            <th class="num" data-key="GFAX">GFAx</th>
+            <th class="num" data-key="XGA">xGA</th>
+            <th class="num" data-key="GSAX">GSAx</th>
           </tr>
         </thead>
         <tbody></tbody>
       </table>
     </div>
 
-	<p id="pointsNote" class="footnote">
-	Points system: Reg W=3, OTW=2, OTL=1, Reg L=0.
-	</p>
+    <p id="pointsNote" class="footnote">
+      Points system: Reg W=3, OTW=2, OTL=1, Reg L=0.
+    </p>
   </main>
 
-  <script type="module" src="../js/teams.js?v=3"></script>
+  <script type="module" src="../js/teams.js?v=5"></script>
 </body>
 </html>
+

@@ -1,6 +1,13 @@
 // js/teams.js
-import { loadCSV, toIntMaybe } from "./data.js";
-import { initSeasonPicker, getSeasonId, onSeasonChange, saveStage, playoffsHaveBegun, applyDefaultStage } from "./season.js";
+import { loadCSV, toIntMaybe, toNumMaybe } from "./data.js";
+import {
+  initSeasonPicker,
+  getSeasonId,
+  onSeasonChange,
+  saveStage,
+  playoffsHaveBegun,
+  applyDefaultStage
+} from "./season.js";
 
 const elSeason = document.getElementById("seasonSelect");
 const elStatus = document.getElementById("status");
@@ -9,9 +16,9 @@ const elTbody  = elTable.querySelector("tbody");
 const elConf   = document.getElementById("confFilter");
 const elStage  = document.getElementById("stageSelect");
 const elPointsNote = document.getElementById("pointsNote");
+const elRateMode = document.getElementById("rateMode");
 
-
-
+// NOTE: legacy manual SF/SA overrides (S1 only) preserved.
 const SHOT_TOTAL_OVERRIDES = {
   S1: {
     REG: {
@@ -34,7 +41,6 @@ const SHOT_TOTAL_OVERRIDES = {
   }
 };
 
-
 let teams = [];      // from teams.csv
 let standings = [];  // computed rows
 let sortKey = "PTS";
@@ -53,27 +59,30 @@ async function boot() {
 
 function wireFilters() {
   elConf.addEventListener("change", render);
+  elRateMode?.addEventListener("change", render);
+
   elStage.addEventListener("change", () => {
-  saveStage(elStage.value, getSeasonId());
-  refresh();
-});
+    saveStage(elStage.value, getSeasonId());
+    refresh();
+  });
+
   elTable.querySelector("thead").addEventListener("click", (e) => {
-  const th = e.target.closest("th");
-  if (!th) return;
+    const th = e.target.closest("th");
+    if (!th) return;
 
-  const key = th.dataset.key;
-  if (!key) return; // non-sortable header
-  if (elStage.value === "PO" && key === "PTS") return;
+    const key = th.dataset.key;
+    if (!key) return; // non-sortable header
+    if (elStage.value === "PO" && key === "PTS") return;
 
-  if (sortKey === key) {
-    sortDir = (sortDir === "desc") ? "asc" : "desc";
-  } else {
-    sortKey = key;
-    sortDir = "desc";
-  }
+    if (sortKey === key) {
+      sortDir = (sortDir === "desc") ? "asc" : "desc";
+    } else {
+      sortKey = key;
+      sortDir = "desc";
+    }
 
-  render();
-});
+    render();
+  });
 }
 
 async function refresh() {
@@ -85,12 +94,12 @@ async function refresh() {
 
   setLoading(true, `Loading ${seasonId}…`);
 
-if (elPointsNote) {
-  elPointsNote.textContent =
-    (elStage.value === "PO")
-      ? ""
-      : "Points system: Reg W=3, OTW=2, OTL=1, Reg L=0.";
-}
+  if (elPointsNote) {
+    elPointsNote.textContent =
+      (elStage.value === "PO")
+        ? ""
+        : "Points system: Reg W=3, OTW=2, OTL=1, Reg L=0.";
+  }
 
   try {
     const teamsPath = `../data/${seasonId}/teams.csv`;
@@ -100,36 +109,31 @@ if (elPointsNote) {
     teams = await loadCSV(teamsPath);
     const games = await loadCSV(gamesPath);
     const schedule = await loadCSV(schedPath);
-	setPlayoffsOptionEnabled(hasAnyPlayoffs(schedule));
-const playoffsBegun = playoffsHaveBegun(schedule, games);
-applyDefaultStage(elStage, seasonId, {
-  playoffsEnabled: hasAnyPlayoffs(schedule),
-  playoffsBegun
-});
+
+    setPlayoffsOptionEnabled(hasAnyPlayoffs(schedule));
+    const playoffsBegun = playoffsHaveBegun(schedule, games);
+    applyDefaultStage(elStage, seasonId, {
+      playoffsEnabled: hasAnyPlayoffs(schedule),
+      playoffsBegun
+    });
+
     buildConferenceOptions(teams);
     standings = computeStandings(teams, games, schedule, seasonId, elStage.value);
-	
-	if (elStage.value === "PO") {
-  sortKey = "W";
-  sortDir = "desc";
-} else if (sortKey === "W") {
-  // optional: snap back if you want REG default
-  sortKey = "PTS";
-  sortDir = "desc";
-}
 
+    // Reasonable defaults: REG sorts by PTS, PO sorts by W
+    if (elStage.value === "PO") {
+      sortKey = "W";
+      sortDir = "desc";
+    } else if (sortKey === "W") {
+      sortKey = "PTS";
+      sortDir = "desc";
+    }
 
     setLoading(false);
     render();
   } catch (err) {
     console.error(err);
-
-    if (isMissingSeasonDataError(err)) {
-      setLoading(true, `No data exists for Season ${seasonId}.`);
-    } else {
-      setLoading(true, `No data exists for Season ${seasonId}.`);
-    }
-
+    setLoading(true, `No data exists for Season ${getSeasonId()}.`);
     elTable.hidden = true;
   }
 }
@@ -137,7 +141,7 @@ applyDefaultStage(elStage, seasonId, {
 function buildConferenceOptions(teamRows) {
   const confs = new Set();
   for (const t of teamRows) {
-    const c = (t.conference ?? "").trim();
+    const c = String(t.conference ?? "").trim();
     if (c) confs.add(c);
   }
 
@@ -166,6 +170,14 @@ function setPlayoffsOptionEnabled(enabled) {
   if (!enabled && elStage.value === "PO") elStage.value = "REG";
 }
 
+function readNumAny(row, keys) {
+  for (const k of keys) {
+    const v = toNumMaybe(row?.[k]);
+    if (v != null) return v;
+  }
+  return null;
+}
+
 function computeStandings(teamRows, gameRows, scheduleRows, seasonId, stageMode) {
   // Map match_id → stage
   const stageByMatch = new Map();
@@ -187,6 +199,7 @@ function computeStandings(teamRows, gameRows, scheduleRows, seasonId, stageMode)
       conference: String(t.conference ?? "").trim(),
       bg_color: String(t.bg_color ?? "").trim(),
       text_color: String(t.text_color ?? "").trim(),
+
       // computed:
       GP: 0,
       W: 0,     // total wins (reg + OT)
@@ -194,10 +207,15 @@ function computeStandings(teamRows, gameRows, scheduleRows, seasonId, stageMode)
       L: 0,     // regulation losses
       OTL: 0,
       PTS: 0,
+
       GF: 0,
       GA: 0,
       SF: 0,
       SA: 0,
+
+      // expected goals (if present in games.csv)
+      xG: null,
+      xGA: null,
     });
   }
 
@@ -209,24 +227,21 @@ function computeStandings(teamRows, gameRows, scheduleRows, seasonId, stageMode)
     const matchId = String(g.match_id ?? "").trim();
     const stage = stageByMatch.get(matchId);
 
-	const s = String(stage ?? "").trim().toLowerCase();
-	const isReg = (s === "reg");
-	const isPO  = (s === "qf" || s === "sf" || s === "f");
+    const s = String(stage ?? "").trim().toLowerCase();
+    const isReg = (s === "reg");
+    const isPO  = (s === "qf" || s === "sf" || s === "f");
 
-	if (stageMode === "PO") {
-	if (!isPO) continue;
-	} else {
-	// default REG
-	if (!isReg) continue;
-	}
-
+    if (stageMode === "PO") {
+      if (!isPO) continue;
+    } else {
+      // default REG
+      if (!isReg) continue;
+    }
 
     const hg = toIntMaybe(g.home_goals);
     const ag = toIntMaybe(g.away_goals);
     const ot = toIntMaybe(g.ot) ?? 0;
 
-    // If a "played" game row exists, goals should be present;
-    // if not, skip safely.
     if (hg === null || ag === null) continue;
 
     const homeRow = tmap.get(home);
@@ -249,16 +264,23 @@ function computeStandings(teamRows, gameRows, scheduleRows, seasonId, stageMode)
       awayRow.SF += as; awayRow.SA += hs;
     }
 
+    // xG/xGA (robust: accept a few common key spellings)
+    const hxg = readNumAny(g, ["xg_home", "home_xG", "home_xg", "home_xg_for", "home_xgf"]);
+	const axg = readNumAny(g, ["xg_away", "away_xG", "away_xg", "away_xg_for", "away_xgf"]);
+    if (hxg != null && axg != null) {
+      homeRow.xG  = (homeRow.xG  ?? 0) + hxg;
+      homeRow.xGA = (homeRow.xGA ?? 0) + axg;
+      awayRow.xG  = (awayRow.xG  ?? 0) + axg;
+      awayRow.xGA = (awayRow.xGA ?? 0) + hxg;
+    }
+
     const isOT = ot > 0;
 
-    // Determine winner/loser
     const homeWin = hg > ag;
     const awayWin = ag > hg;
-
-    if (!homeWin && !awayWin) continue; // no ties expected
+    if (!homeWin && !awayWin) continue;
 
     if (!isOT) {
-      // Regulation: W=3, L=0
       if (homeWin) {
         homeRow.W += 1;
         homeRow.PTS += 3;
@@ -269,7 +291,6 @@ function computeStandings(teamRows, gameRows, scheduleRows, seasonId, stageMode)
         homeRow.L += 1;
       }
     } else {
-      // OT: OTW=2, OTL=1 (W also counts total wins)
       if (homeWin) {
         homeRow.W += 1;
         homeRow.OTW += 1;
@@ -289,28 +310,25 @@ function computeStandings(teamRows, gameRows, scheduleRows, seasonId, stageMode)
   }
 
   // Apply optional manual SF/SA overrides (e.g., S1 totals)
-const stageKey = (stageMode === "PO") ? "PO" : "REG";
+  const stageKey = (stageMode === "PO") ? "PO" : "REG";
+  const ovSeason = SHOT_TOTAL_OVERRIDES[seasonId];
+  const ovStage  = ovSeason?.[stageKey];
 
-const ovSeason = SHOT_TOTAL_OVERRIDES[seasonId];
-const ovStage  = ovSeason?.[stageKey];
+  if (ovStage) {
+    for (const [team_id, v] of Object.entries(ovStage)) {
+      const row = tmap.get(team_id);
+      if (!row) continue;
 
-if (ovStage) {
-  for (const [team_id, v] of Object.entries(ovStage)) {
-    const row = tmap.get(team_id);
-    if (!row) continue;
-
-    if (typeof v?.SF === "number") row.SF = v.SF;
-    if (typeof v?.SA === "number") row.SA = v.SA;
+      if (typeof v?.SF === "number") row.SF = v.SF;
+      if (typeof v?.SA === "number") row.SA = v.SA;
+    }
   }
-}
 
-  // Output array + derived diff
   const out = [...tmap.values()].map(r => ({
     ...r,
-    DIFF: r.GF - r.GA,
+    DIFF: (r.GF ?? 0) - (r.GA ?? 0),
   }));
 
-  // Default sort: PTS desc, DIFF desc, GF desc, team_name asc
   out.sort((a, b) =>
     (b.PTS - a.PTS) ||
     (b.DIFF - a.DIFF) ||
@@ -326,8 +344,9 @@ function render() {
 
   let view = standings.slice();
   if (conf !== "__ALL__") {
-    view = view.filter(r => (r.conference ?? "") === conf);
+    view = view.filter(r => String(r.conference ?? "") === conf);
   }
+
   view.sort((a, b) => compareByKey(a, b, sortKey, sortDir));
   updateSortIndicators();
 
@@ -343,8 +362,15 @@ function render() {
 
 function renderRow(r, seasonId) {
   const tr = document.createElement("tr");
+  const rateMode = elRateMode?.value || "TOTAL";
+  const gp = r.GP ?? 0;
 
-  // --- helpers ---
+  const per15 = (n) => {
+    if (n == null) return null;
+    if (rateMode !== "P15") return n;
+    return gp > 0 ? (n / gp) : null; // games are 15 minutes
+  };
+
   const tdText = (text, cls) => {
     const cell = document.createElement("td");
     if (cls) cell.className = cls;
@@ -352,23 +378,22 @@ function renderRow(r, seasonId) {
     return cell;
   };
 
-  const tdNum = (n) => {
+  const tdNumMaybe = (n, decimals = null, signed = false) => {
     const td = document.createElement("td");
     td.className = "num";
-    td.textContent = String(n ?? 0);
-    return td;
-  };
 
-  const tdNumSigned = (n) => {
-    const td = document.createElement("td");
-    td.className = "num";
-    const v = n ?? 0;
-    td.textContent = v > 0 ? `+${v}` : String(v);
+    if (n == null || !isFinite(n)) {
+      td.textContent = "";
+      return td;
+    }
+
+    const v = Number(n);
+    const s = (decimals != null) ? v.toFixed(decimals) : String(Math.trunc(v));
+    td.textContent = signed && v > 0 ? `+${s}` : s;
     return td;
   };
 
   const tdPct = (rate) => {
-    // rate: 0.193 -> "19.3%"
     const td = document.createElement("td");
     td.className = "num";
     if (rate == null || !isFinite(rate)) {
@@ -380,7 +405,6 @@ function renderRow(r, seasonId) {
   };
 
   const td1 = (n) => {
-    // one-decimal number (PDO)
     const td = document.createElement("td");
     td.className = "num";
     if (n == null || !isFinite(n)) {
@@ -390,16 +414,8 @@ function renderRow(r, seasonId) {
     td.textContent = n.toFixed(1);
     return td;
   };
-  
-  const tdPerGame = (n) => {
-  const td = document.createElement("td");
-  td.className = "num";
-  if (n == null || !isFinite(n)) { td.textContent = ""; return td; }
-  td.textContent = n.toFixed(1);
-  return td;
-};
 
-  // --- Logo ---
+  // Logo
   const tdLogo = document.createElement("td");
   tdLogo.className = "logo-cell";
   if (r.bg_color) tdLogo.style.backgroundColor = r.bg_color;
@@ -413,7 +429,7 @@ function renderRow(r, seasonId) {
   img.onerror = () => (img.style.visibility = "hidden");
   tdLogo.appendChild(img);
 
-  // --- Team link ---
+  // Team link
   const tdTeam = document.createElement("td");
   const a = document.createElement("a");
   a.className = "team-link";
@@ -421,45 +437,53 @@ function renderRow(r, seasonId) {
   a.textContent = r.team_name || r.team_id;
   tdTeam.appendChild(a);
 
-  // --- Derived stats ---
-  const gdiff = (r.GF ?? 0) - (r.GA ?? 0);
-
+  // Derived stats
+  const gf = r.GF ?? 0;
+  const ga = r.GA ?? 0;
   const sf = r.SF ?? 0;
   const sa = r.SA ?? 0;
-  
-  const gp = r.GP ?? 0;
 
-  const gfpg = gp > 0 ? (r.GF ?? 0) / gp : null;
-  const gapg = gp > 0 ? (r.GA ?? 0) / gp : null;
-  const sfpg = gp > 0 ? sf / gp : null;
-  const sapg = gp > 0 ? sa / gp : null;
+  const gdiff = gf - ga;
 
-  const shRate = sf > 0 ? (r.GF ?? 0) / sf : null;                  // GF/SF
-  const svRate = sa > 0 ? (sa - (r.GA ?? 0)) / sa : null;           // (SA-GA)/SA
-  const pdo = (shRate != null && svRate != null) ? (shRate + svRate) * 100 : null; // x100
+  const shRate = sf > 0 ? gf / sf : null;
+  const svRate = sa > 0 ? (sa - ga) / sa : null;
+  const pdo = (shRate != null && svRate != null) ? (shRate + svRate) * 100 : null;
 
-  // --- Append cells in your requested order ---
+  const xg = (r.xG == null ? null : r.xG);
+  const xga = (r.xGA == null ? null : r.xGA);
+
+  const gfax = (xg == null ? null : (gf - xg));
+  const gsax = (xga == null ? null : (xga - ga));
+
+  const isPer15 = (rateMode === "P15");
+
   tr.appendChild(tdLogo);
   tr.appendChild(tdTeam);
 
-  tr.appendChild(tdNum(r.GP));
-  tr.appendChild(tdNum(r.W));
-  tr.appendChild(tdNum(r.OTW));
-  tr.appendChild(tdNum(r.OTL));
-  tr.appendChild(tdNum(r.L));
-  tr.appendChild(elStage.value === "PO" ? tdText("-", "num") : tdNum(r.PTS));
-  tr.appendChild(tdNum(r.GF));
-  tr.appendChild(tdNum(r.GA));
-  tr.appendChild(tdNumSigned(gdiff));                 
-  tr.appendChild(tdNum(sf));                         
-  tr.appendChild(tdNum(sa));                         
-  tr.appendChild(tdPct(shRate));                      
-  tr.appendChild(tdPct(svRate));                     
-  tr.appendChild(td1(pdo));                           
-  tr.appendChild(tdPerGame(gfpg)); 
-  tr.appendChild(tdPerGame(gapg)); 
-  tr.appendChild(tdPerGame(sfpg)); 
-  tr.appendChild(tdPerGame(sapg)); 
+  // unchanged by per15 toggle
+  tr.appendChild(tdNumMaybe(r.GP, null));
+  tr.appendChild(tdNumMaybe(r.W, null));
+  tr.appendChild(tdNumMaybe(r.OTW, null));
+  tr.appendChild(tdNumMaybe(r.OTL, null));
+  tr.appendChild(tdNumMaybe(r.L, null));
+  tr.appendChild(elStage.value === "PO" ? tdText("-", "num") : tdNumMaybe(r.PTS, null));
+
+  tr.appendChild(tdNumMaybe(gdiff, null, true));
+  tr.appendChild(tdPct(shRate));
+  tr.appendChild(tdPct(svRate));
+
+  tr.appendChild(td1(pdo));
+
+  // per15 toggle affects everything below
+  tr.appendChild(tdNumMaybe(per15(gf), isPer15 ? 2 : null));
+  tr.appendChild(tdNumMaybe(per15(ga), isPer15 ? 2 : null));
+  tr.appendChild(tdNumMaybe(per15(sf), isPer15 ? 2 : null));
+  tr.appendChild(tdNumMaybe(per15(sa), isPer15 ? 2 : null));
+
+  tr.appendChild(tdNumMaybe(per15(xg), 2));
+  tr.appendChild(tdNumMaybe(per15(gfax), 2));
+  tr.appendChild(tdNumMaybe(per15(xga), 2));
+  tr.appendChild(tdNumMaybe(per15(gsax), 2));
 
   return tr;
 }
@@ -470,61 +494,67 @@ function setLoading(isLoading, msg = "") {
   elTable.hidden = isLoading;
 }
 
-function isMissingSeasonDataError(err) {
-  const msg = String(err?.message ?? err ?? "");
-  const m = msg.match(/HTTP\s+(\d+)/i);
-  const status = m ? Number(m[1]) : null;
-
-  // treat any fetch failure as "no data" for user-facing message.
-  return status === 404 || status === 400 || status === 403 || status === 500 || status === null;
-}
-
 function compareByKey(a, b, key, dir) {
   const av = getSortValue(a, key);
   const bv = getSortValue(b, key);
 
-  // null/blank always at bottom
   const aNull = (av == null || Number.isNaN(av));
   const bNull = (bv == null || Number.isNaN(bv));
   if (aNull && bNull) return 0;
   if (aNull) return 1;
   if (bNull) return -1;
 
-  const diff = bv - av; // default desc
+  const diff = bv - av;
   return (dir === "desc") ? diff : -diff;
 }
 
 function getSortValue(r, key) {
+  const rateMode = elRateMode?.value || "TOTAL";
   const gp = r.GP ?? 0;
+
+  const per15 = (n) => {
+    if (n == null) return null;
+    if (rateMode !== "P15") return n;
+    return gp > 0 ? (n / gp) : null;
+  };
+
   const gf = r.GF ?? 0;
   const ga = r.GA ?? 0;
   const sf = r.SF ?? 0;
   const sa = r.SA ?? 0;
 
-  const sh = sf > 0 ? gf / sf : null;                 // 0.193
-  const sv = sa > 0 ? (sa - ga) / sa : null;          // 0.822
+  const sh = sf > 0 ? gf / sf : null;
+  const sv = sa > 0 ? (sa - ga) / sa : null;
   const pdo = (sh != null && sv != null) ? (sh + sv) * 100 : null;
 
+  const xg = (r.xG == null ? null : r.xG);
+  const xga = (r.xGA == null ? null : r.xGA);
+  const gfax = (xg == null ? null : (gf - xg));
+  const gsax = (xga == null ? null : (xga - ga));
+
   switch (key) {
+    // unchanged keys
     case "GP": return r.GP ?? 0;
     case "W": return r.W ?? 0;
     case "OTW": return r.OTW ?? 0;
     case "OTL": return r.OTL ?? 0;
     case "L": return r.L ?? 0;
     case "PTS": return r.PTS ?? 0;
-    case "GF": return gf;
-    case "GA": return ga;
     case "GDIFF": return gf - ga;
-    case "SF": return sf;
-    case "SA": return sa;
-    case "SH": return sh;         // keep as rate for sorting
-    case "SV": return sv;         // keep as rate for sorting
+    case "SH": return sh;
+    case "SV": return sv;
     case "PDO": return pdo;
 
-    case "GFPG": return gp > 0 ? gf / gp : null;
-    case "GAPG": return gp > 0 ? ga / gp : null;
-    case "SFPG": return gp > 0 ? sf / gp : null;
-    case "SAPG": return gp > 0 ? sa / gp : null;
+    // per15-affected keys
+    case "GF": return per15(gf);
+    case "GA": return per15(ga);
+    case "SF": return per15(sf);
+    case "SA": return per15(sa);
+
+    case "XG": return per15(xg);
+    case "XGA": return per15(xga);
+    case "GFAX": return per15(gfax);
+    case "GSAX": return per15(gsax);
 
     default: return null;
   }
