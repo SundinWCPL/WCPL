@@ -2,6 +2,4 @@
 node_modules/
 
 # Importer runtime files (raw + processed games)
-ops/incoming/**
-ops/processed/**
-ops/sandbox/**
+ops/

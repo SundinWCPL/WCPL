@@ -267,7 +267,13 @@ if (teamId === "FREE_AGENT") {
 const gp_s = toIntMaybe(p.gp_s) ?? 0;
 const pts  = toIntMaybe(p.pts) ?? 0;
 
+const gDisp = valueMaybePer15(g, p, "SKATER", advOn, rateMode);
+const aDisp = valueMaybePer15(toIntMaybe(p.a) ?? 0, p, "SKATER", advOn, rateMode);
+
 const sp = toNumMaybe(p.sp);
+
+const xg = toNumMaybe(p.xG);
+const xgDisp = valueMaybePer15(xg, p, "SKATER", advOn, rateMode);
 
 const ptsDisp  = valueMaybePer15(pts, p, "SKATER", advOn, rateMode);
 const shotsDisp= valueMaybePer15(shots, p, "SKATER", advOn, rateMode);
@@ -291,6 +297,24 @@ const possDisp = (rateMode === "P15")
     const sa = toIntMaybe(p.sa);
     const ga = toIntMaybe(p.ga);
     const sv = (sa != null && ga != null) ? (sa - ga) : null;
+	
+	const saDisp = valueMaybePer15(sa, p, "GOALIE", advOn, rateMode);
+	const gaDisp = valueMaybePer15(ga, p, "GOALIE", advOn, rateMode);
+	const svDisp = valueMaybePer15(sv, p, "GOALIE", advOn, rateMode);
+
+	const wRaw  = toIntMaybe(p.wins);
+	const soRaw = toIntMaybe(p.so);
+
+	const wDisp  = valueMaybePer15(wRaw, p, "GOALIE", advOn, rateMode);
+	const soDisp = valueMaybePer15(soRaw, p, "GOALIE", advOn, rateMode);
+
+	const xga = toNumMaybe(p.xGA);
+	const xgaDisp = valueMaybePer15(xga, p, "GOALIE", advOn, rateMode);
+
+	const gsax = (xga != null && ga != null) ? (xga - ga) : null;
+	const gsaxDisp = valueMaybePer15(gsax, p, "GOALIE", advOn, rateMode);
+	
+	
 
     return {
       player_key: (p.player_key ?? "").trim(),
@@ -301,7 +325,10 @@ const possDisp = (rateMode === "P15")
       // skater
       gp_s,
       g,
+      gDisp,
       a: toIntMaybe(p.a) ?? 0,
+      aDisp,
+
 pts,
 ptsDisp,
 shots: (shots !== null ? Math.trunc(shots) : null),
@@ -316,18 +343,34 @@ to: toIntMaybe(p.turnovers),
 toDisp,
 possDisp,
 
+xg,
+xgDisp,
+
 sp,
 spDisp,
 
       // goalie
       gp_g,
       sa,
-      ga,
-      sv,
-      svp, // 0-1
-      gaa,
-      w: toIntMaybe(p.wins),
-      so: toIntMaybe(p.so),
+	ga,
+	sv,
+	saDisp,
+	gaDisp,
+	svDisp,
+	
+	svp,
+	gaa,
+
+	w: wRaw,
+	so: soRaw,
+	wDisp,
+	soDisp,
+
+	  
+	  xga,
+	xgaDisp,
+	gsax,
+	gsaxDisp,
 
       // star points (shown in both modes)
       sp,
@@ -378,17 +421,22 @@ spDisp,
     aPlayer.textContent = r.name;
     tdPlayer.appendChild(aPlayer);
 
-    // Team link
-    const tdTeam = document.createElement("td");
-    if (!r.team_id) {
-      tdTeam.textContent = "Free Agent";
-    } else {
-      const aTeam = document.createElement("a");
-      aTeam.className = "team-link";
-      aTeam.href = `team.html?season=${encodeURIComponent(seasonId)}&team_id=${encodeURIComponent(r.team_id)}`;
-      aTeam.textContent = r.team_id;
-      tdTeam.appendChild(aTeam);
-    }
+// Team link
+const tdTeam = document.createElement("td");
+
+if (!r.team_id) {
+  if (r.player_key === "name:jurkey") {
+    tdTeam.textContent = "Genuine Piece of Shit";
+  } else {
+    tdTeam.textContent = "Free Agent";
+  }
+} else {
+  const aTeam = document.createElement("a");
+  aTeam.className = "team-link";
+  aTeam.href = `team.html?season=${encodeURIComponent(seasonId)}&team_id=${encodeURIComponent(r.team_id)}`;
+  aTeam.textContent = r.team_id;
+  tdTeam.appendChild(aTeam);
+}
 
     tr.appendChild(tdLogo);
     tr.appendChild(tdPlayer);
@@ -397,19 +445,29 @@ spDisp,
 
     if (mode === "GOALIE") {
       tr.appendChild(tdNum(r.gp_g));
-      tr.appendChild(tdNumMaybe(r.sa));
-      tr.appendChild(tdNumMaybe(r.ga));
-      tr.appendChild(tdNumMaybe(r.sv));
-      tr.appendChild(tdPctMaybe(r.svp !== null ? r.svp * 100 : null, 1));
-      tr.appendChild(tdNumMaybe(r.gaa, 2));
-      tr.appendChild(tdNumMaybe(r.w));
-      tr.appendChild(tdNumMaybe(r.so));
-      tr.appendChild(tdNumMaybe(r.sp, 1));
+      const isPer15 = rateMode === "P15";
+
+	tr.appendChild(tdNumMaybe(r.saDisp, isPer15 ? 2 : null));
+	tr.appendChild(tdNumMaybe(r.gaDisp, isPer15 ? 2 : null));
+	tr.appendChild(tdNumMaybe(r.svDisp, isPer15 ? 2 : null));
+	tr.appendChild(tdPctMaybe(r.svp !== null ? r.svp * 100 : null, 1));
+	tr.appendChild(tdNumMaybe(r.gaa, 2));
+	tr.appendChild(tdNumMaybe(r.wDisp,  isPer15 ? 2 : null));
+	tr.appendChild(tdNumMaybe(r.soDisp, isPer15 ? 2 : null));
+
+
+	tr.appendChild(tdNumMaybe(r.xgaDisp, 2));
+	tr.appendChild(tdNumMaybe(r.gsaxDisp, 2));
+
+	tr.appendChild(tdNumMaybe(r.sp, 1));
+
 } else {
   tr.appendChild(tdNum(r.gp_s));
-  tr.appendChild(tdNum(r.g));
-  tr.appendChild(tdNum(r.a));
-const isPer15 = rateMode === "P15";
+  const isPer15 = rateMode === "P15";
+
+  tr.appendChild(tdNumMaybe(r.gDisp, isPer15 ? 2 : null));
+  tr.appendChild(tdNumMaybe(r.aDisp, isPer15 ? 2 : null));
+
 
 tr.appendChild(tdNumMaybe(r.ptsDisp, isPer15 ? 2 : null));
 tr.appendChild(tdNumMaybe(r.shotsDisp, isPer15 ? 2 : null));
@@ -422,6 +480,7 @@ tr.appendChild(tdNumMaybe(r.toDisp,   isPer15 ? 2 : null, true));
 tr.appendChild(tdNumMaybe(r.possDisp, isPer15 ? 1 : 1, true));
   }
 
+tr.appendChild(tdNumMaybe(r.xgDisp, 2));                 // always 2 dp
 tr.appendChild(tdNumMaybe(r.spDisp, isPer15 ? 2 : 1));
 }
 
@@ -436,10 +495,10 @@ function isSortKeyAllowedForMode(key, mode) {
   if (!key) return false;
 
   if (mode === "GOALIE") {
-    return ["GPG", "SA", "GA", "SV", "SVP", "GAA", "W", "SO", "SP"].includes(key);
+    return ["GPG", "SA", "GA", "SV", "SVP", "GAA", "W", "SO", "XGA", "GSAX", "SP"].includes(key);
   }
 
-  return ["GPS", "G", "A", "PTS", "S", "SH", "HIT", "TA", "TO", "POSS", "SP"].includes(key);
+  return ["GPS", "G", "A", "PTS", "S", "SH", "HIT", "TA", "TO", "POSS", "XG", "SP"].includes(key);
 }
 
 function compareByKey(a, b, key, dir, mode) {
@@ -476,6 +535,8 @@ function getSortValue(r, key, mode) {
       case "GAA": return (r.gaa == null ? null : r.gaa);
       case "W":   return (r.w == null ? null : r.w);
       case "SO":  return (r.so == null ? null : r.so);
+	  case "XGA":  return (r.xgaDisp == null ? null : r.xgaDisp);
+	  case "GSAX": return (r.gsaxDisp == null ? null : r.gsaxDisp);
       case "SP":  return (r.sp == null ? null : r.sp);
       default:    return null;
     }
@@ -499,7 +560,7 @@ switch (key) {
   case "TA":   return (r.taDisp   == null ? null : r.taDisp);
   case "TO":   return (r.toDisp   == null ? null : r.toDisp);
   case "POSS": return (r.possDisp == null ? null : r.possDisp);
-
+  case "XG":   return (r.xgDisp == null ? null : r.xgDisp);
   case "SP":   return (r.spDisp == null ? null : r.spDisp);
   default:     return null;
 }
@@ -592,6 +653,8 @@ function renderHeader(mode, advOn) {
       { label: "GAA", cls: "num", key: "GAA" },
       { label: "W", cls: "num", key: "W" },
       { label: "SO", cls: "num", key: "SO" },
+	  { label: "xGA", cls: "num", key: "XGA" },
+	  { label: "GSAx", cls: "num", key: "GSAX" },
       { label: "SP", cls: "num", key: "SP" },
     );
   } else {
@@ -619,8 +682,10 @@ cols.push(
 
 // SP columns always at the very end
 cols.push(
+  { label: "xG", cls: "num", key: "XG" },
   { label: "SP", cls: "num", key: "SP" },
 );
+
   }
 
   const tr = document.createElement("tr");

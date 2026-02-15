@@ -537,47 +537,53 @@ function renderGameTeamTables(seasonId, rows, elSk, elGo) {
   });
 
   // Headers (your “full nerd minus touches/toi”)
-  setTableHeader(elSk, ["Player", "Pos", "G", "A", "Sh", "Pass", "Ex", "En", "HIT", "TA", "TO", "FOW", "FOL", "Poss (s)", "SP"]);
-  setTableHeader(elGo, ["Goalie", "SA", "GA", "SV%", "SV", "Body Sv", "Stick Sv", "Pass", "W", "SO", "SP"]);
+  setTableHeader(elSk, ["Player", "Pos", "G", "A", "Sh", "Pass", "Ex", "En", "HIT", "TA", "TO", "FOW", "FOL", "Poss (s)", "xG", "SP"]);
+  setTableHeader(elGo, ["Goalie", "SA", "GA", "SV%", "SV", "Body Sv", "Stick Sv", "Pass", "W", "SO", "xGA", "GSAx", "SP"]);
 
   fillTable(elSk, sk.map(r => ([
+  playerLinkHtmlFromBox(seasonId, r),
+  escapeHtml(String(r.position ?? "")),
+  valOrBlank(r.g),
+  valOrBlank(r.a),
+  valOrBlank(r.shots),
+  valOrBlank(r.passes),
+  valOrBlank(r.exits),
+  valOrBlank(r.entries),
+  valOrBlank(r.hits),
+  valOrBlank(r.takeaways),
+  valOrBlank(r.turnovers),
+  valOrBlank(r.fow),
+  valOrBlank(r.fol),
+  valOrBlank(r.poss_s),
+  fmtNum(toNumMaybe(r.xG), 2),
+  valOrBlank(r.sp),
+])));
+
+fillTable(elGo, go.map(r => {
+  const sa = toIntMaybe(r.sa) ?? 0;
+  const ga = toIntMaybe(r.ga) ?? 0;
+  const svp = sa > 0 ? ((sa - ga) / sa) : null;
+  const sv = sa - ga;
+
+  const xga = toNumMaybe(r.xGA);
+  const gsax = (xga != null) ? (xga - ga) : null;
+
+  return [
     playerLinkHtmlFromBox(seasonId, r),
-    escapeHtml(String(r.position ?? "")),
-    valOrBlank(r.g),
-    valOrBlank(r.a),
-    valOrBlank(r.shots),
+    valOrBlank(r.sa),
+    valOrBlank(r.ga),
+    fmtPct(svp, 1),
+    String(sv),
+    valOrBlank(r.body_sv),
+    valOrBlank(r.stick_sv),
     valOrBlank(r.passes),
-    valOrBlank(r.exits),
-    valOrBlank(r.entries),
-    valOrBlank(r.hits),
-    valOrBlank(r.takeaways),
-    valOrBlank(r.turnovers),
-    valOrBlank(r.fow),
-    valOrBlank(r.fol),
-    valOrBlank(r.poss_s),
-	valOrBlank(r.sp),
-  ])));
-
-  fillTable(elGo, go.map(r => {
-    const sa = toIntMaybe(r.sa) ?? 0;
-    const ga = toIntMaybe(r.ga) ?? 0;
-    const svp = sa > 0 ? ((sa - ga) / sa) : null;
-	const sv = sa - ga;
-
-    return [
-      playerLinkHtmlFromBox(seasonId, r),
-      valOrBlank(r.sa),
-      valOrBlank(r.ga),
-      fmtPct(svp, 1),
-	  String(sv),
-      valOrBlank(r.body_sv),
-      valOrBlank(r.stick_sv),
-	  valOrBlank(r.passes),
-      valOrBlank(r.w),
-      valOrBlank(r.so),
-	  valOrBlank(r.sp),
-    ];
-  }));
+    valOrBlank(r.w),
+    valOrBlank(r.so),
+    fmtNum(xga, 2),
+    fmtNum(gsax, 2),
+    valOrBlank(r.sp),
+  ];
+}));
 
   elSk.hidden = false;
   elGo.hidden = false;
@@ -965,22 +971,31 @@ function parseShotSummary(summary) {
   const s = String(summary ?? "").trim();
   if (!s) return [];
 
-  // New format per event:
-  // t|Team|SteamID|shotKind|shotType|contactV|contactY|x|z|result
   return s.split(";").map(part => {
     const fields = part.split("|");
-    return {
-      t: fields[0] ?? "",                // e.g., "P1 - 3:24"
-      teamColor: fields[1] ?? "",        // "Red" / "Blue"
-      steamId: fields[2] ?? "",
-      shotKind: fields[3] ?? "",         // "shot" / "bat"starGlyph
-      shotType: fields[4] ?? "",         // "shot" / "one_timer" / etc
-      contactV: toNumMaybe(fields[5]),   // PuckVelocity from save/goal row
-      contactY: toNumMaybe(fields[6]),   // yCoord from save/goal row
-      x: toNumMaybe(fields[7]),
-      z: toNumMaybe(fields[8]),
-      result: fields[9] ?? ""            // "G" or "S"
-    };
+
+    // Back-compat:
+    // Old: t team steam kind type contactV contactY x z result  (len 10)
+    // New: t team steam kind type xg_i contactV contactY x z result (len 11)
+
+    const isNew = fields.length >= 11;
+
+    const t = fields[0] ?? "";
+    const teamColor = fields[1] ?? "";
+    const steamId = fields[2] ?? "";
+    const shotKind = fields[3] ?? "";
+    const shotType = fields[4] ?? "";
+
+    const xg_i = isNew ? toIntMaybe(fields[5]) : null;
+    const xg = (xg_i != null) ? (xg_i / 1000) : null;
+
+    const contactV = toNumMaybe(fields[isNew ? 6 : 5]);
+    const contactY = toNumMaybe(fields[isNew ? 7 : 6]);
+    const x = toNumMaybe(fields[isNew ? 8 : 7]);
+    const z = toNumMaybe(fields[isNew ? 9 : 8]);
+    const result = fields[isNew ? 10 : 9] ?? "";
+
+    return { t, teamColor, steamId, shotKind, shotType, xg, contactV, contactY, x, z, result };
   }).filter(e => Number.isFinite(e.x) && Number.isFinite(e.z));
 }
 
@@ -1086,15 +1101,19 @@ const contactSpeed = (e.contactV != null && Number.isFinite(e.contactV))
     ? "At Goal Line"
     : "At Save";
 
-  return [
+const xgStr = (e.xg != null && Number.isFinite(e.xg)) ? e.xg.toFixed(2) : "";
+
+return [
   player,
   String(e.t || ""),
   Number.isFinite(dist) ? dist.toFixed(1) : "",
   typeLine,
   atLabel,
   contactSpeed,
-  contactY
+  contactY,
+  xgStr
 ];
+
 }),
 hovertemplate:
   "<b>%{customdata[0]}</b><br>" +
@@ -1103,6 +1122,7 @@ hovertemplate:
   "Type: %{customdata[3]}<br>" +
   "Speed (%{customdata[4]}): %{customdata[5]} " + SPEED_UNIT + "<br>" +
   "Puck Height (%{customdata[4]}): %{customdata[6]} m<br>" +
+  "xG: %{customdata[7]}<br>" +
   "<extra></extra>",
     marker
   });

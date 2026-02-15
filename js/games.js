@@ -86,6 +86,19 @@ async function refresh() {
   }
 }
 
+function dateKey(s) {
+  const v = String(s ?? "").trim();
+  if (!v) return NaN;
+
+  // schedule.csv / games.csv imported_on is expected YYYY-MM-DD
+  const [yyyy, mm, dd] = v.split("-").map(Number);
+  if (!yyyy || !mm || !dd) return NaN;
+
+  // Numeric key for easy compare (2026-02-14 -> 20260214)
+  return (yyyy * 10000) + (mm * 100) + dd;
+}
+
+
 function renderSeries() {
   const seasonId = getSeasonId();
   const stageMode = (elStage?.value ?? "reg");
@@ -460,22 +473,6 @@ function hasValidScore(g) {
 function fallbackTeam(team_id) {
   const id = (team_id ?? "").trim();
   return { team_id: id || "UNKNOWN", bg_color: "", text_color: "" };
-}
-
-function formatDate(s) {
-  const v = (s ?? "").trim();
-  if (!v) return "";
-
-  // Expect YYYY-MM-DD
-  const [yyyy, mm, dd] = v.split("-").map(Number);
-  if (!yyyy || !mm || !dd) return v;
-
-  const d = new Date(yyyy, mm - 1, dd); // LOCAL date constructor
-
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
 }
 
 function formatDate(s) {
