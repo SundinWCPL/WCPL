@@ -275,6 +275,9 @@ const sp = toNumMaybe(p.sp);
 const xg = toNumMaybe(p.xG);
 const xgDisp = valueMaybePer15(xg, p, "SKATER", advOn, rateMode);
 
+const gfax = (xg != null) ? (g - xg) : null;
+const gfaxDisp = valueMaybePer15(gfax, p, "SKATER", advOn, rateMode);
+
 const ptsDisp  = valueMaybePer15(pts, p, "SKATER", advOn, rateMode);
 const shotsDisp= valueMaybePer15(shots, p, "SKATER", advOn, rateMode);
 const hitsDisp = valueMaybePer15(toIntMaybe(p.hits), p, "SKATER", advOn, rateMode);
@@ -345,6 +348,9 @@ possDisp,
 
 xg,
 xgDisp,
+
+gfax,
+gfaxDisp,
 
 sp,
 spDisp,
@@ -481,6 +487,7 @@ tr.appendChild(tdNumMaybe(r.possDisp, isPer15 ? 1 : 1, true));
   }
 
 tr.appendChild(tdNumMaybe(r.xgDisp, 2));                 // always 2 dp
+tr.appendChild(tdNumMaybe(r.gfaxDisp, 2));
 tr.appendChild(tdNumMaybe(r.spDisp, isPer15 ? 2 : 1));
 }
 
@@ -498,7 +505,7 @@ function isSortKeyAllowedForMode(key, mode) {
     return ["GPG", "SA", "GA", "SV", "SVP", "GAA", "W", "SO", "XGA", "GSAX", "SP"].includes(key);
   }
 
-  return ["GPS", "G", "A", "PTS", "S", "SH", "HIT", "TA", "TO", "POSS", "XG", "SP"].includes(key);
+  return ["GPS", "G", "A", "PTS", "S", "SH", "HIT", "TA", "TO", "POSS", "XG", "GFAX", "SP"].includes(key);
 }
 
 function compareByKey(a, b, key, dir, mode) {
@@ -561,6 +568,7 @@ switch (key) {
   case "TO":   return (r.toDisp   == null ? null : r.toDisp);
   case "POSS": return (r.possDisp == null ? null : r.possDisp);
   case "XG":   return (r.xgDisp == null ? null : r.xgDisp);
+  case "GFAX": return (r.gfaxDisp == null ? null : r.gfaxDisp);
   case "SP":   return (r.spDisp == null ? null : r.spDisp);
   default:     return null;
 }
@@ -683,6 +691,7 @@ cols.push(
 // SP columns always at the very end
 cols.push(
   { label: "xG", cls: "num", key: "XG" },
+  { label: "GFAx", cls: "num", key: "GFAX" },
   { label: "SP", cls: "num", key: "SP" },
 );
 
