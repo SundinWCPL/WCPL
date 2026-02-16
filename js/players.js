@@ -458,6 +458,7 @@ if (!r.team_id) {
 	tr.appendChild(tdNumMaybe(r.svDisp, isPer15 ? 2 : null));
 	tr.appendChild(tdPctMaybe(r.svp !== null ? r.svp * 100 : null, 1));
 	tr.appendChild(tdNumMaybe(r.gaa, 2));
+	tr.appendChild(tdNumMaybe(r.ptsDisp, isPer15 ? 2 : null));
 	tr.appendChild(tdNumMaybe(r.wDisp,  isPer15 ? 2 : null));
 	tr.appendChild(tdNumMaybe(r.soDisp, isPer15 ? 2 : null));
 
@@ -502,7 +503,7 @@ function isSortKeyAllowedForMode(key, mode) {
   if (!key) return false;
 
   if (mode === "GOALIE") {
-    return ["GPG", "SA", "GA", "SV", "SVP", "GAA", "W", "SO", "XGA", "GSAX", "SP"].includes(key);
+    return ["GPG", "SA", "GA", "SV", "SVP", "GAA", "PTS", "W", "SO", "XGA", "GSAX", "SP"].includes(key);
   }
 
   return ["GPS", "G", "A", "PTS", "S", "SH", "HIT", "TA", "TO", "POSS", "XG", "GFAX", "SP"].includes(key);
@@ -535,43 +536,43 @@ function getSortValue(r, key, mode) {
   if (mode === "GOALIE") {
     switch (key) {
       case "GPG": return r.gp_g ?? 0;
-      case "SA":  return (r.sa == null ? null : r.sa);
-      case "GA":  return (r.ga == null ? null : r.ga);
-      case "SV":  return (r.sv == null ? null : r.sv);
+
+      case "SA":  return (r.saDisp == null ? null : r.saDisp);
+      case "GA":  return (r.gaDisp == null ? null : r.gaDisp);
+      case "SV":  return (r.svDisp == null ? null : r.svDisp);
+      case "W":   return (r.wDisp  == null ? null : r.wDisp);
+      case "SO":  return (r.soDisp == null ? null : r.soDisp);
       case "SVP": return (r.svp == null ? null : r.svp); // 0-1
       case "GAA": return (r.gaa == null ? null : r.gaa);
-      case "W":   return (r.w == null ? null : r.w);
-      case "SO":  return (r.so == null ? null : r.so);
-	  case "XGA":  return (r.xgaDisp == null ? null : r.xgaDisp);
-	  case "GSAX": return (r.gsaxDisp == null ? null : r.gsaxDisp);
-      case "SP":  return (r.sp == null ? null : r.sp);
+	  case "PTS": return (r.ptsDisp == null ? null : r.ptsDisp);
+      case "XGA":  return (r.xgaDisp == null ? null : r.xgaDisp);
+      case "GSAX": return (r.gsaxDisp == null ? null : r.gsaxDisp);
+      case "SP":  return (r.spDisp == null ? null : r.spDisp);
+
       default:    return null;
     }
   }
 
-// SKATER
-switch (key) {
-  case "GPS":  return r.gp_s ?? 0;
-  case "G":    return r.g ?? 0;
-  case "A":    return r.a ?? 0;
+  // SKATER
+  switch (key) {
+    case "GPS": return r.gp_s ?? 0;
 
-  // Sort by displayed value (Totals or Per15)
-  case "PTS":  return (r.ptsDisp == null ? null : r.ptsDisp);
-  case "S":    return (r.shotsDisp == null ? null : r.shotsDisp);
 
-  // still a rate
-  case "SH":   return (r.shRate == null ? null : r.shRate);
+    case "G":   return (r.gDisp == null ? null : r.gDisp);
+    case "A":   return (r.aDisp == null ? null : r.aDisp);
+    case "PTS":  return (r.ptsDisp == null ? null : r.ptsDisp);
+    case "S":    return (r.shotsDisp == null ? null : r.shotsDisp);
+    case "SH":   return (r.shRate == null ? null : r.shRate);
+    case "HIT":  return (r.hitsDisp == null ? null : r.hitsDisp);
+    case "TA":   return (r.taDisp   == null ? null : r.taDisp);
+    case "TO":   return (r.toDisp   == null ? null : r.toDisp);
+    case "POSS": return (r.possDisp == null ? null : r.possDisp);
+    case "XG":   return (r.xgDisp   == null ? null : r.xgDisp);
+    case "GFAX": return (r.gfaxDisp == null ? null : r.gfaxDisp);
+    case "SP":   return (r.spDisp   == null ? null : r.spDisp);
 
-  // Sort by displayed adv values
-  case "HIT":  return (r.hitsDisp == null ? null : r.hitsDisp);
-  case "TA":   return (r.taDisp   == null ? null : r.taDisp);
-  case "TO":   return (r.toDisp   == null ? null : r.toDisp);
-  case "POSS": return (r.possDisp == null ? null : r.possDisp);
-  case "XG":   return (r.xgDisp == null ? null : r.xgDisp);
-  case "GFAX": return (r.gfaxDisp == null ? null : r.gfaxDisp);
-  case "SP":   return (r.spDisp == null ? null : r.spDisp);
-  default:     return null;
-}
+    default: return null;
+  }
 }
 
 function updateSortIndicators() {
@@ -659,6 +660,7 @@ function renderHeader(mode, advOn) {
       { label: "Sv", cls: "num", key: "SV" },
       { label: "SV%", cls: "num", key: "SVP" },
       { label: "GAA", cls: "num", key: "GAA" },
+	  { label: "PTS", cls: "num", key: "PTS" },
       { label: "W", cls: "num", key: "W" },
       { label: "SO", cls: "num", key: "SO" },
 	  { label: "xGA", cls: "num", key: "XGA" },

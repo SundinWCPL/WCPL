@@ -7,6 +7,7 @@
 
   <link rel="stylesheet" href="../css/main.css" />
   <link rel="stylesheet" href="../css/tables.css" />
+  <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
 </head>
 
 <body>
@@ -61,13 +62,21 @@
         <div class="card-title team-box-title stats-header">
           <span>Skater Stats</span>
 
-          <label class="control compact">
-            <span>Stats</span>
-            <select id="stageSelect">
-              <option value="REG">Regular Season</option>
-              <option value="PO">Playoffs</option>
-            </select>
-          </label>
+<div style="display:flex; gap:10px; align-items:center;">
+  <label class="control compact">
+    <select id="rateMode">
+      <option value="TOTAL">Totals</option>
+      <option value="P15">Per 15</option>
+    </select>
+  </label>
+
+  <label class="control compact">
+    <select id="stageSelect">
+      <option value="REG">Regular Season</option>
+      <option value="PO">Playoffs</option>
+    </select>
+  </label>
+</div>
         </div>
 
         <div class="table-wrap">
@@ -103,27 +112,13 @@
       <!-- RIGHT: Game log -->
       <div class="card team-box">
         <div class="card-title team-box-title">
-          Game Log <span class="card-subtitle">(Last 10 Games)</span>
+          Performance <span class="card-subtitle">(Last 10 Games)</span>
         </div>
 
         <div id="gameLogStatus" class="status" hidden></div>
 
-        <div class="table-wrap">
-          <table class="data-table" id="gameLogTable">
-            <thead>
-              <tr>
-                <th class="num">Week</th>
-                <th>Opponent</th>
-                <th class="left">When</th>
-                <th class="num">Score</th>
-                <th class="left">Result</th>
-              </tr>
-            </thead>
-            <tbody></tbody>
-          </table>
-        </div>
+<div id="perfChart" style="width:100%; height:320px;"></div>
 
-        <div class="table-spacer"></div>
       </div>
 
     </section>
