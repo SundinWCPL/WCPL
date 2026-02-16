@@ -1010,14 +1010,14 @@ function distToNet(x, z) {
 function renderShotMapPlotly({ divId, events, seasonId, teamLabel }) {
   const el = document.getElementById(divId);
   if (!el) return;
-  const RINK_X = 22.3;
-const END_Z  = 45.6;
-const BLUE_Z = 13.25;
+  const RINK_X = 22.5;
+const END_Z  = 45.75;
+const BLUE_Z = 13.3;
 const GOAL_Z = 39.8;
-const NET_BACK_Z = 41.3;
-const POST_X_L = -1.5;
-const POST_X_R =  1.5;
-const NET_DEPTH_VIS = 2.2;   // how deep the net goes (visual)
+const NET_BACK_Z = 41.6;
+const POST_X_L = -1.56;
+const POST_X_R =  1.56;
+const NET_DEPTH_VIS = 1.8;   // how deep the net goes (visual)
 const NET_CORNER_R  = 0.6;   // roundness of back corners (visual)
 const BOARD_CORNER_R = 2.5; // meters, visual only
 const CREASE_RADIUS = 3.2; // visual, meters
@@ -1097,9 +1097,11 @@ const contactSpeed = (e.contactV != null && Number.isFinite(e.contactV))
   : "";
   const contactY = (e.contactY != null && Number.isFinite(e.contactY)) ? e.contactY.toFixed(2) : "";
 
-  const atLabel = (String(e.result || "").toUpperCase() === "G")
-    ? "At Goal Line"
-    : "At Save";
+  const speedLabel = "From Stick";
+
+const heightLabel = (String(e.result || "").toUpperCase() === "G")
+  ? "At Goal Line"
+  : "At Save";
 
 const xgStr = (e.xg != null && Number.isFinite(e.xg)) ? e.xg.toFixed(2) : "";
 
@@ -1108,7 +1110,8 @@ return [
   String(e.t || ""),
   Number.isFinite(dist) ? dist.toFixed(1) : "",
   typeLine,
-  atLabel,
+  speedLabel,
+  heightLabel,
   contactSpeed,
   contactY,
   xgStr
@@ -1120,9 +1123,9 @@ hovertemplate:
   "%{customdata[1]}<br>" +
   "Distance: %{customdata[2]} m<br>" +
   "Type: %{customdata[3]}<br>" +
-  "Speed (%{customdata[4]}): %{customdata[5]} " + SPEED_UNIT + "<br>" +
-  "Puck Height (%{customdata[4]}): %{customdata[6]} m<br>" +
-  "xG: %{customdata[7]}<br>" +
+  "Speed (%{customdata[4]}): %{customdata[6]} " + SPEED_UNIT + "<br>" +
+  "Puck Height (%{customdata[5]}): %{customdata[7]} m<br>" +
+  "xG: %{customdata[8]}<br>" +
   "<extra></extra>",
     marker
   });
