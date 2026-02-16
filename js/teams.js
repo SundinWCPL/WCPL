@@ -44,7 +44,7 @@ const SHOT_TOTAL_OVERRIDES = {
 let teams = [];      // from teams.csv
 let standings = [];  // computed rows
 let sortKey = "PTS";
-let sortDir = "desc"; // "desc" or "asc"
+let sortDir = "desc"; // "desc" or "ascc"
 
 boot();
 

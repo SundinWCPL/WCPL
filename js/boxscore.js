@@ -21,7 +21,7 @@ const elPlayedBoxscore = document.getElementById("playedBoxscore");
 // 2.23694 = m/s → mph
 // 3.6     = m/s → km/h
 const SPEED_MULT = 3.6;
-const SPEED_UNIT = "kph";
+const SPEED_UNIT = "km/h";
 
 let playerMaps = { bySteam: null, byName: null };
 
