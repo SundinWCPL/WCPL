@@ -46,6 +46,17 @@ let standings = [];  // computed rows
 let sortKey = "PTS";
 let sortDir = "desc"; // "desc" or "ascc"
 
+let advEnabled = true;
+
+const ADV_KEYS = ["XG", "GFAX", "XGA", "GSAX"];
+
+function setAdvHeadersVisible(enabled) {
+  for (const k of ADV_KEYS) {
+    const th = elTable.querySelector(`thead th[data-key="${k}"]`);
+    if (th) th.hidden = !enabled;
+  }
+}
+
 boot();
 
 async function boot() {
@@ -116,6 +127,11 @@ async function refresh() {
       playoffsEnabled: hasAnyPlayoffs(schedule),
       playoffsBegun
     });
+	
+	const seasons = await loadCSV("../data/seasons.csv");
+	const meta = seasons.find(s => String(s.season_id ?? "").trim() === seasonId);
+	advEnabled = (toIntMaybe(meta?.adv_stats) ?? 0) === 1;
+	setAdvHeadersVisible(advEnabled);
 
     buildConferenceOptions(teams);
     standings = computeStandings(teams, games, schedule, seasonId, elStage.value);
@@ -480,10 +496,12 @@ function renderRow(r, seasonId) {
   tr.appendChild(tdNumMaybe(per15(sf), isPer15 ? 2 : null));
   tr.appendChild(tdNumMaybe(per15(sa), isPer15 ? 2 : null));
 
+  if (advEnabled) {
   tr.appendChild(tdNumMaybe(per15(xg), 2));
   tr.appendChild(tdNumMaybe(per15(gfax), 2));
   tr.appendChild(tdNumMaybe(per15(xga), 2));
   tr.appendChild(tdNumMaybe(per15(gsax), 2));
+}
 
   return tr;
 }
@@ -511,6 +529,8 @@ function compareByKey(a, b, key, dir) {
 function getSortValue(r, key) {
   const rateMode = elRateMode?.value || "TOTAL";
   const gp = r.GP ?? 0;
+  
+  if (!advEnabled && ADV_KEYS.includes(key)) return null;
 
   const per15 = (n) => {
     if (n == null) return null;
