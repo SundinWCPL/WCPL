@@ -882,6 +882,7 @@ const maxAbsLeague = percentile(absAll, 95) ?? 50; // fallback if early season /
   const y = [];
   const hover = [];
   const colors = [];
+  const matchIds = [];
 
   for (let i = 0; i < last10.length; i++) {
     const r = last10[i];
@@ -889,6 +890,7 @@ const maxAbsLeague = percentile(absAll, 95) ?? 50; // fallback if early season /
 	const posRaw = String(r.position ?? "").trim();
 	const posLabel = posRaw ? `POS: ${escapeHtml(posRaw)}<br>` : "";
     const matchId = String(r.match_id ?? "").trim();
+	matchIds.push(matchId);
     const sched = schedById.get(matchId) || null;
 
     const myTeamId = String(r.team_id ?? "").trim();
@@ -1104,6 +1106,7 @@ const markerTrace = {
   y,
   text: hover,
   hoverinfo: "text",
+  customdata: matchIds,
   cliponaxis: false,
   marker: {
     size: 10,
@@ -1165,7 +1168,29 @@ shapes: [
   [...segmentTraces, avgLineTrace, markerTrace],
   layout,
   config
-);
+).then(() => {
+  // avoid stacking handlers if renderGameLog runs multiple times
+  if (!elPerfChart.__wcplClickBound) {
+    elPerfChart.__wcplClickBound = true;
+
+    elPerfChart.on("plotly_click", (ev) => {
+      const pt = ev?.points?.[0];
+      const matchId = pt?.customdata;
+      if (!matchId) return;
+
+      const isPages = window.location.pathname.includes("/pages/");
+      const boxPath = isPages ? "boxscore.html" : "pages/boxscore.html";
+
+      const qs = new URLSearchParams();
+      qs.set("season", seasonId);
+      qs.set("match_id", matchId);
+      if (stage) qs.set("stage", stage); // harmless even if boxscore ignores it
+
+      window.location.href = `${boxPath}?${qs.toString()}`;
+    });
+  }
+});
+
 }
 
 
