@@ -1043,6 +1043,25 @@ function blendRgb(c1, c2, t = 0.5) {
 const yVals = y.filter(v => v != null && Number.isFinite(v));
 const maxAbsPlayer = yVals.length ? Math.max(...yVals.map(v => Math.abs(v))) : 0;
 
+// Average performance (last N games)
+const avgPerf =
+  yVals.length > 0
+    ? (yVals.reduce((a, b) => a + b, 0) / yVals.length)
+    : null;
+
+let avgPerfText;
+
+if (avgPerf == null) {
+  avgPerfText = "Average Performance (Last 10 Games): —";
+} else {
+  const pctStr = `${avgPerf >= 0 ? "+" : ""}${avgPerf.toFixed(1)}%`;
+  const color = perfToColor(avgPerf);
+
+  avgPerfText =
+    `Average Performance (Last 10 Games): ` +
+    `<span style="font-weight:700; color:${color};">${pctStr}</span>`;
+}
+
 const maxAbs = Math.max(maxAbsLeague, maxAbsPlayer);
 const pad = maxAbs > 0 ? maxAbs * 0.05 : 10;
 
@@ -1117,7 +1136,7 @@ const markerTrace = {
 };
 
   const layout = {
-    margin: { l: 0, r: 0, t: 0, b: 0 },
+    margin: { l: 0, r: 0, t: 40, b: 0 },
 	
 	paper_bgcolor: "rgba(0,0,0,0)",
 	plot_bgcolor: "rgba(0,0,0,0)",
@@ -1150,6 +1169,27 @@ shapes: [
     line: { width: 1, dash: "dot", color: "#cccccc" }
   },
   ...verticalLines
+],
+
+annotations: [
+  {
+	align: "center",
+    bgcolor: "rgba(0,0,0,0)",
+    borderpad: 0,
+    text: avgPerfText,
+    xref: "paper",
+    yref: "paper",
+    x: 0.5,
+    y: 1.08,
+    showarrow: false,
+    xanchor: "center",
+    yanchor: "bottom",
+	captureevents: false,
+    font: {
+      size: 13,
+      color: "#e7e7e7"
+    }
+  }
 ],
 
   };
