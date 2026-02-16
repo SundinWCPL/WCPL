@@ -120,6 +120,10 @@ async function refresh() {
     teams = await loadCSV(teamsPath);
     const games = await loadCSV(gamesPath);
     const schedule = await loadCSV(schedPath);
+	
+	let boxscores = [];
+	try { boxscores = await loadCSV(`../data/${seasonId}/boxscores.csv`); }
+	catch { boxscores = []; }
 
     setPlayoffsOptionEnabled(hasAnyPlayoffs(schedule));
     const playoffsBegun = playoffsHaveBegun(schedule, games);
@@ -134,7 +138,7 @@ async function refresh() {
 	setAdvHeadersVisible(advEnabled);
 
     buildConferenceOptions(teams);
-    standings = computeStandings(teams, games, schedule, seasonId, elStage.value);
+    standings = computeStandings(teams, games, schedule, boxscores, seasonId, elStage.value);
 
     // Reasonable defaults: REG sorts by PTS, PO sorts by W
     if (elStage.value === "PO") {
@@ -194,7 +198,7 @@ function readNumAny(row, keys) {
   return null;
 }
 
-function computeStandings(teamRows, gameRows, scheduleRows, seasonId, stageMode) {
+function computeStandings(teamRows, gameRows, scheduleRows, boxscoreRows, seasonId, stageMode) {
   // Map match_id → stage
   const stageByMatch = new Map();
   for (const s of scheduleRows) {
@@ -215,6 +219,8 @@ function computeStandings(teamRows, gameRows, scheduleRows, seasonId, stageMode)
       conference: String(t.conference ?? "").trim(),
       bg_color: String(t.bg_color ?? "").trim(),
       text_color: String(t.text_color ?? "").trim(),
+	  TEAM_SEC: 0, // summed game-clock seconds for this team (OT-aware)
+
 
       // computed:
       GP: 0,
@@ -234,6 +240,40 @@ function computeStandings(teamRows, gameRows, scheduleRows, seasonId, stageMode)
       xGA: null,
     });
   }
+  
+// --- Team game-clock seconds (OT-aware) from boxscores.csv ---
+// For each (match_id, team_id), use max(toi_s) as the game duration for that team.
+const durByMatchTeam = new Map(); // key = `${matchId}|${teamId}` -> maxToi
+
+for (const r of (boxscoreRows || [])) {
+  const teamId = String(r.team_id ?? "").trim();
+  const matchId = String(r.match_id ?? "").trim();
+  if (!teamId || !matchId) continue;
+
+  const stage = String(stageByMatch.get(matchId) ?? "").trim().toLowerCase();
+  const isReg = (stage === "reg");
+  const isPO  = (stage === "qf" || stage === "sf" || stage === "f");
+
+  if (stageMode === "PO") {
+    if (!isPO) continue;
+  } else {
+    if (!isReg) continue;
+  }
+
+  const toi = toNumMaybe(r.toi_s);
+  if (!(toi > 0)) continue;
+
+  const key = `${matchId}|${teamId}`;
+  const prev = durByMatchTeam.get(key) ?? 0;
+  if (toi > prev) durByMatchTeam.set(key, toi);
+}
+
+// apply durations to teams
+for (const [key, dur] of durByMatchTeam.entries()) {
+  const [, teamId] = key.split("|");
+  const team = tmap.get(teamId);
+  if (team) team.TEAM_SEC += dur;
+}
 
   for (const g of gameRows) {
     const home = String(g.home_team_id ?? "").trim();
@@ -381,11 +421,14 @@ function renderRow(r, seasonId) {
   const rateMode = elRateMode?.value || "TOTAL";
   const gp = r.GP ?? 0;
 
-  const per15 = (n) => {
-    if (n == null) return null;
-    if (rateMode !== "P15") return n;
-    return gp > 0 ? (n / gp) : null; // games are 15 minutes
-  };
+const teamSec = r.TEAM_SEC ?? 0;
+
+const per15 = (n) => {
+  if (n == null) return null;
+  if (rateMode !== "P15") return n;
+  if (teamSec > 0) return (n * 900 / teamSec);
+  return gp > 0 ? (n / gp) : null;
+};
 
   const tdText = (text, cls) => {
     const cell = document.createElement("td");
@@ -532,11 +575,14 @@ function getSortValue(r, key) {
   
   if (!advEnabled && ADV_KEYS.includes(key)) return null;
 
-  const per15 = (n) => {
-    if (n == null) return null;
-    if (rateMode !== "P15") return n;
-    return gp > 0 ? (n / gp) : null;
-  };
+const teamSec = r.TEAM_SEC ?? 0;
+
+const per15 = (n) => {
+  if (n == null) return null;
+  if (rateMode !== "P15") return n;
+  if (teamSec > 0) return (n * 900 / teamSec);
+  return gp > 0 ? (n / gp) : null;
+};
 
   const gf = r.GF ?? 0;
   const ga = r.GA ?? 0;
