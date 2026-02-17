@@ -277,6 +277,11 @@ body.team-page .card .card-body{
   color: #d7dde6;
 }
 
+/* Make Team page wider only */
+body.team-page .page {
+  max-width: 1300px;   /* try 1350–1500 */
+}
+
 /* Tables stay neutral/readable */
 body.team-page .card .data-table th,
 body.team-page .card .data-table td{
@@ -303,7 +308,107 @@ body.team-page .card .data-table td{
   box-shadow: 0 10px 30px rgba(0,0,0,0.35);
 }
 
+/* Player analytics bars (match perf chart styling) */
+#playerBarsChart {
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.06);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+}
+
+/* Keep Plotly canvas rounded */
+#playerBarsChart .plot-container {
+  border-radius: 14px;
+}
+
 /* Optional: a little breathing room inside the card */
 #perfChart .plot-container {
   border-radius: 14px;
 }
+
+/* Team analytics radar "card" (match player perf chart styling) */
+body.team-page .analytics-frame{
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.06);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+
+  display: grid;
+  grid-template-rows: 40px 1fr 40px;   /* ↑ more vertical space */
+  height: 520px;
+}
+
+/* Keep Plotly canvas rounded too */
+body.team-page .analytics-frame .plot-container{
+  border-radius: 14px;
+}
+
+/* Plot area fills middle row */
+body.team-page .analytics-plot{
+  width: 100%;
+  height: 100%;
+}
+
+/* Header/footer live INSIDE the bordered frame */
+body.team-page .analytics-cap{
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  letter-spacing: 0.08em;
+  color: rgba(255,255,255,0.65);
+}
+
+.team-hero {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.team-hero-right {
+  display: flex;
+  align-items: center;
+}
+
+.team-schedule-btn {
+  padding: 10px 20px;
+  font-weight: 700;
+  border-radius: 14px; /* more rounded */
+  text-decoration: none;
+  display: inline-block;
+
+  border: 2px solid color-mix(
+    in srgb,
+    var(--team-bg, #2a3340) 75%,
+    #000000
+  );
+
+  transition: all 0.18s ease;
+}
+
+.team-schedule-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0,0,0,0.35);
+}
+
+/* Team page: keep roster title + filters on one line */
+.stats-header{
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+/* Keep the two selects side-by-side, not stacked */
+.stats-header .control.compact{
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.stats-header .control.compact { 
+  flex-direction: row !important;
+}
+

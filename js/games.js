@@ -9,6 +9,7 @@ const elTbody  = elTable.querySelector("tbody");
 const elThead  = elTable.querySelector("thead");
 const elStage = document.getElementById("stageSelect");
 const elGameStatus = document.getElementById("gameStatus");
+const elTeamFilter = document.getElementById("teamFilter");
 
 let teams = [];
 let scheduleRows = [];
@@ -30,6 +31,7 @@ async function boot() {
     renderSeries();
   });
   elGameStatus.addEventListener("change", renderSeries);
+  elTeamFilter.addEventListener("change", renderSeries);
 // Click-to-sort on headers (Players-style)
 elThead.addEventListener("click", (e) => {
   const th = e.target.closest("th");
@@ -63,7 +65,27 @@ async function refresh() {
 
   try {
     teams = await loadCSV(`../data/${seasonId}/teams.csv`);
-    scheduleRows = await loadCSV(`../data/${seasonId}/schedule.csv`);
+populateTeamFilter();
+
+// Preselect team filter from URL (?team=WEST) if present
+const teamFromUrl = (getUrlParam("team") ?? "").trim();
+
+if (teamFromUrl && elTeamFilter) {
+  const exists = [...elTeamFilter.options].some(o => o.value === teamFromUrl);
+
+  if (exists) {
+    elTeamFilter.value = teamFromUrl;
+
+    // If landing from team page, default to "All Games"
+    if (elGameStatus) {
+      elGameStatus.value = "all";
+      lastGameStatus = null; // force re-evaluation of default sort
+    }
+  }
+}
+
+
+scheduleRows = await loadCSV(`../data/${seasonId}/schedule.csv`);
 
     try {
       gamesRows = await loadCSV(`../data/${seasonId}/games.csv`);
@@ -86,6 +108,30 @@ async function refresh() {
   }
 }
 
+function populateTeamFilter() {
+  if (!elTeamFilter) return;
+
+  const current = elTeamFilter.value;
+
+  elTeamFilter.innerHTML = `<option value="all">All</option>`;
+
+  teams
+    .map(t => (t.team_id ?? "").trim())
+    .filter(Boolean)
+    .sort()
+    .forEach(id => {
+      const opt = document.createElement("option");
+      opt.value = id;
+      opt.textContent = id;
+      elTeamFilter.appendChild(opt);
+    });
+
+  // Try to preserve selection if possible
+  if ([...elTeamFilter.options].some(o => o.value === current)) {
+    elTeamFilter.value = current;
+  }
+}
+
 function dateKey(s) {
   const v = String(s ?? "").trim();
   if (!v) return NaN;
@@ -98,12 +144,17 @@ function dateKey(s) {
   return (yyyy * 10000) + (mm * 100) + dd;
 }
 
+function getUrlParam(key) {
+  const url = new URL(window.location.href);
+  return url.searchParams.get(key);
+}
 
 function renderSeries() {
   const seasonId = getSeasonId();
   const stageMode = (elStage?.value ?? "reg");
   const gameStatus = elGameStatus?.value ?? "played";
   const includeUnplayed = (gameStatus === "all");
+  const teamFilter = elTeamFilter?.value ?? "all";
   if (gameStatus !== lastGameStatus) {
   // Default behavior:
   // - Completed: latest first (desc)
@@ -254,10 +305,20 @@ rows.push({
   date: latest,
 });
   }
+  
+  let filteredRows = rows;
+
+if (teamFilter !== "all") {
+  filteredRows = rows.filter(r =>
+    r.home_team_id === teamFilter ||
+    r.away_team_id === teamFilter
+  );
+}
+
 
 const dir = (sortDir === "asc") ? 1 : -1;
 
-rows.sort((a, b) => {
+filteredRows.sort((a, b) => {
   let cmp = 0;
 
   if (sortKey === "WEEK") {
@@ -303,7 +364,7 @@ const addGroupHeaderRow = (label, subLabel = "") => {
   elTbody.appendChild(trGroup);
 };
 
-for (const r of rows) {
+for (const r of filteredRows) {
   const gk = groupKeyForRow(r, stageMode);
   if (gk !== lastGroupKey) {
     const { label, sub } = groupLabelForRow(r, stageMode);

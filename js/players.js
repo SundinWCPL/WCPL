@@ -281,6 +281,8 @@ const gfaxDisp = valueMaybePer15(gfax, p, "SKATER", advOn, rateMode);
 const ptsDisp  = valueMaybePer15(pts, p, "SKATER", advOn, rateMode);
 const shotsDisp= valueMaybePer15(shots, p, "SKATER", advOn, rateMode);
 const hitsDisp = valueMaybePer15(toIntMaybe(p.hits), p, "SKATER", advOn, rateMode);
+const blocksDisp = valueMaybePer15(toIntMaybe(p.blocks), p, "SKATER", advOn, rateMode);
+const passesDisp = valueMaybePer15(toIntMaybe(p.passes), p, "SKATER", advOn, rateMode);
 const taDisp   = valueMaybePer15(toIntMaybe(p.takeaways), p, "SKATER", advOn, rateMode);
 const toDisp   = valueMaybePer15(toIntMaybe(p.turnovers), p, "SKATER", advOn, rateMode);
 const spDisp   = valueMaybePer15(sp, p, "SKATER", advOn, rateMode);
@@ -340,6 +342,10 @@ shRate,
 
 hits: toIntMaybe(p.hits),
 hitsDisp,
+blocks: toIntMaybe(p.blocks),
+blocksDisp,
+passes: toIntMaybe(p.passes),
+passesDisp,
 ta: toIntMaybe(p.takeaways),
 taDisp,
 to: toIntMaybe(p.turnovers),
@@ -482,6 +488,8 @@ tr.appendChild(tdNumMaybe(r.shotsDisp, isPer15 ? 2 : null));
 
   if (advOn) {
 tr.appendChild(tdNumMaybe(r.hitsDisp, isPer15 ? 2 : null, true));
+tr.appendChild(tdNumMaybe(r.blocksDisp, isPer15 ? 2 : null, true));
+tr.appendChild(tdNumMaybe(r.passesDisp, isPer15 ? 2 : null, true));
 tr.appendChild(tdNumMaybe(r.taDisp,   isPer15 ? 2 : null, true));
 tr.appendChild(tdNumMaybe(r.toDisp,   isPer15 ? 2 : null, true));
 tr.appendChild(tdNumMaybe(r.possDisp, isPer15 ? 1 : 1, true));
@@ -506,7 +514,7 @@ function isSortKeyAllowedForMode(key, mode) {
     return ["GPG", "SA", "GA", "SV", "SVP", "GAA", "PTS", "W", "SO", "XGA", "GSAX", "SP"].includes(key);
   }
 
-  return ["GPS", "G", "A", "PTS", "S", "SH", "HIT", "TA", "TO", "POSS", "XG", "GFAX", "SP"].includes(key);
+  return ["GPS", "G", "A", "PTS", "S", "SH", "HIT", "BLK", "PASS", "TA", "TO", "POSS", "XG", "GFAX", "SP"].includes(key);
 }
 
 function compareByKey(a, b, key, dir, mode) {
@@ -564,6 +572,8 @@ function getSortValue(r, key, mode) {
     case "S":    return (r.shotsDisp == null ? null : r.shotsDisp);
     case "SH":   return (r.shRate == null ? null : r.shRate);
     case "HIT":  return (r.hitsDisp == null ? null : r.hitsDisp);
+	case "BLK":  return (r.blocksDisp == null ? null : r.blocksDisp);
+	case "PASS": return (r.passesDisp == null ? null : r.passesDisp);
     case "TA":   return (r.taDisp   == null ? null : r.taDisp);
     case "TO":   return (r.toDisp   == null ? null : r.toDisp);
     case "POSS": return (r.possDisp == null ? null : r.possDisp);
@@ -680,6 +690,8 @@ function renderHeader(mode, advOn) {
 if (advOn) {
 cols.push(
   { label: "HIT", cls: "num adv", key: "HIT" },
+  { label: "BLK", cls: "num adv", key: "BLK" },
+  { label: "PASS", cls: "num adv", key: "PASS" },
   { label: "TA",  cls: "num adv", key: "TA"  },
   { label: "TO",  cls: "num adv", key: "TO"  },
   {

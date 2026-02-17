@@ -234,6 +234,8 @@ function computeStandings(teamRows, gameRows, scheduleRows, boxscoreRows, season
       GA: 0,
       SF: 0,
       SA: 0,
+	  HIT: 0,
+	  BLK: 0,
 
       // expected goals (if present in games.csv)
       xG: null,
@@ -273,6 +275,29 @@ for (const [key, dur] of durByMatchTeam.entries()) {
   const [, teamId] = key.split("|");
   const team = tmap.get(teamId);
   if (team) team.TEAM_SEC += dur;
+}
+
+// --- Aggregate team HIT + BLK from boxscores ---
+for (const r of (boxscoreRows || [])) {
+  const teamId = String(r.team_id ?? "").trim();
+  if (!teamId) continue;
+
+  const matchId = String(r.match_id ?? "").trim();
+  const stage = String(stageByMatch.get(matchId) ?? "").trim().toLowerCase();
+  const isReg = (stage === "reg");
+  const isPO  = (stage === "qf" || stage === "sf" || stage === "f");
+
+  if (stageMode === "PO") {
+    if (!isPO) continue;
+  } else {
+    if (!isReg) continue;
+  }
+
+  const team = tmap.get(teamId);
+  if (!team) continue;
+
+  team.HIT += (toIntMaybe(r.hits) ?? 0);
+  team.BLK += (toIntMaybe(r.blocks) ?? 0);
 }
 
   for (const g of gameRows) {
@@ -538,6 +563,8 @@ const per15 = (n) => {
   tr.appendChild(tdNumMaybe(per15(ga), isPer15 ? 2 : null));
   tr.appendChild(tdNumMaybe(per15(sf), isPer15 ? 2 : null));
   tr.appendChild(tdNumMaybe(per15(sa), isPer15 ? 2 : null));
+  tr.appendChild(tdNumMaybe(per15(r.HIT), isPer15 ? 2 : null));
+  tr.appendChild(tdNumMaybe(per15(r.BLK), isPer15 ? 2 : null));
 
   if (advEnabled) {
   tr.appendChild(tdNumMaybe(per15(xg), 2));
@@ -616,6 +643,8 @@ const per15 = (n) => {
     case "GA": return per15(ga);
     case "SF": return per15(sf);
     case "SA": return per15(sa);
+	case "HIT": return per15(r.HIT);
+	case "BLK": return per15(r.BLK);
 
     case "XG": return per15(xg);
     case "XGA": return per15(xga);
