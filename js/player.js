@@ -1473,7 +1473,11 @@ xaxis: {
 },
 yaxis: {
   showgrid: false,
-  tickfont: { size: 12 },
+  tickfont: {
+    size: 12,
+    family: "Inter, Arial, sans-serif",  // ← change this
+    color: "#e7e7e7"                      // optional
+  },
   fixedrange: true,
 
   tickmode: "array",
