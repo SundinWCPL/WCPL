@@ -1060,7 +1060,7 @@ if (role === "GOALIE") {
   ];
 
   if (hasPossession) {
-    off.push({ key: "possession_15", label: "POSS/15", long: "Possession per 15", kind: "num" });
+    off.push({ key: "possession_15", label: "POSS/15", long: "Possession per 15 (min)", kind: "num" });
   }
 
   const def = [
