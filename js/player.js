@@ -124,29 +124,59 @@ function mergeRoleSplitTotals(a, b) {
 }
 
 async function computeCareerRoleSplitFromAllSeasons(seasonsMeta, stage, pSeason) {
-  // seasonsMeta should be your seasons.csv rows (each with season_id like "S1", "S2", etc.)
   let total = {
     skater: { g: 0, a: 0, pts: 0, passes: 0 },
     goalie: { g: 0, a: 0, pts: 0, passes: 0 },
   };
 
+  const playerKey = String(pSeason.player_key ?? "").trim();
+
   for (const s of (seasonsMeta || [])) {
-    const sid = s.season_id || s.id || s.season || s.Season;
+    const sid = s.season_id;
     if (!sid) continue;
 
-    const boxPath = (stage === "PO")
-      ? `../data/${sid}/boxscores_playoffs.csv`
-      : `../data/${sid}/boxscores.csv`;
+    const advThisSeason = (toIntMaybe(s.adv_stats) ?? 0) === 1;
 
-    const boxRows = await loadCSV(boxPath).catch(() => null);
-    if (!boxRows || !boxRows.length) continue;
+    // ---- CASE 1: Modern season (has boxscores) ----
+    if (advThisSeason) {
+      const boxPath = (stage === "PO")
+        ? `../data/${sid}/boxscores_playoffs.csv`
+        : `../data/${sid}/boxscores.csv`;
 
-    const split = computeRoleSplitFromBoxscores(boxRows, pSeason);
-    total = mergeRoleSplitTotals(total, split);
+      const boxRows = await loadCSV(boxPath).catch(() => null);
+      if (!boxRows || !boxRows.length) continue;
+
+      const split = computeRoleSplitFromBoxscores(boxRows, pSeason);
+      total = mergeRoleSplitTotals(total, split);
+    }
+
+    // ---- CASE 2: Legacy season (S1) ----
+    else {
+      const playersPath = `../data/${sid}/players.csv`;
+      const rows = await loadCSV(playersPath).catch(() => null);
+      if (!rows) continue;
+
+      const r = rows.find(x =>
+        String(x.player_key ?? "").trim() === playerKey
+      );
+      if (!r) continue;
+
+      // Dump everything into SKATER bucket
+      const g = toIntMaybe(r.g) ?? 0;
+      const a = toIntMaybe(r.a) ?? 0;
+      const pts = toIntMaybe(r.pts) ?? (g + a);
+
+      total.skater.g += g;
+      total.skater.a += a;
+      total.skater.pts += pts;
+
+      // passes did not exist in S1 — leave 0
+    }
   }
 
   return total;
 }
+
 
 async function refresh() {
   const seasonId = getSeasonId();
@@ -518,9 +548,10 @@ const s_pts = (roleSplitSeason ? roleSplitSeason.skater.pts : (toIntMaybe(pSeaso
 
   /* ---------------- Skater (Career) ---------------- */
   const c_gp   = career.gp_s ?? 0;
-  const cs_g = roleSplitCareer?.skater?.g ?? (toIntMaybe(career.g) ?? 0);
-  const cs_a = roleSplitCareer?.skater?.a ?? (toIntMaybe(career.a) ?? 0);
-  const cs_pts = roleSplitCareer?.skater?.pts ?? (toIntMaybe(career.pts) ?? 0);
+  const careerIsFlex = (toIntMaybe(career.gp_s) ?? 0) > 0 && (toIntMaybe(career.gp_g) ?? 0) > 0;
+  const cs_g   = (careerIsFlex && roleSplitCareer) ? (roleSplitCareer.skater.g   ?? 0) : (toIntMaybe(career.g)   ?? 0);
+  const cs_a   = (careerIsFlex && roleSplitCareer) ? (roleSplitCareer.skater.a   ?? 0) : (toIntMaybe(career.a)   ?? 0);
+  const cs_pts = (careerIsFlex && roleSplitCareer) ? (roleSplitCareer.skater.pts ?? 0) : (toIntMaybe(career.pts) ?? 0);
   const c_g = cs_g;
   const c_a = cs_a;
   const c_pts = cs_pts;
@@ -645,8 +676,8 @@ const g_passes = (roleSplitSeason ? roleSplitSeason.goalie.passes : toIntMaybe(p
   const cg_w  = career.wins ?? 0;
   const cg_so = career.so ?? 0;
 
-  const cg_pts = roleSplitCareer?.goalie?.pts ?? toIntMaybe(career.pts);
-  const cg_passes = roleSplitCareer?.goalie?.passes ?? toIntMaybe(career.passes);
+  const cg_pts    = (careerIsFlex && roleSplitCareer) ? (roleSplitCareer.goalie.pts ?? 0) : (toIntMaybe(career.pts) ?? 0);
+  const cg_passes = (careerIsFlex && roleSplitCareer) ? (roleSplitCareer.goalie.passes ?? 0) : (toIntMaybe(career.passes) ?? 0);
 
   const cg_xga = (career.xGA ?? null);
   const cg_ga_adv = career.ga_adv ?? 0;
