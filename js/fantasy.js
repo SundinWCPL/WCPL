@@ -122,22 +122,37 @@ function render() {
       const teamName = String(r.gm_id ?? "").trim(); // FULL gm_id string as requested
 
       // Dynamically grab all playerN columns
-const keys = Object.keys(r)
+const cols = Object.keys(r)
   .filter(k => /^player\d+$/i.test(k))
   .sort((a, b) => {
     const na = Number(a.replace(/\D/g, ""));
     const nb = Number(b.replace(/\D/g, ""));
     return na - nb;
+  });
+
+
+const players = cols
+  .map(col => {
+    const k = String(r[col] ?? "").trim();
+    if (!k) return null;
+
+    const prow = pmap.get(k);
+    const baseSp = computeFantasyPointsFromPlayerRow(prow);
+
+    // NEW: optional per-slot adjustment + note (e.g., player2_adj, player2_note)
+    const adj = toNum(r[`${col}_adj`]);
+    const note = String(r[`${col}_note`] ?? "").trim();
+
+    const sp = baseSp + adj;
+
+    const displayName = (prow?.name && String(prow.name).trim())
+      ? String(prow.name).trim()
+      : stripNamePrefix(k);
+
+    return { key: k, displayName, sp, adj, note };
   })
-  .map(k => String(r[k] ?? "").trim())
   .filter(Boolean);
 
-      const players = keys.map(k => {
-        const prow = pmap.get(k);
-        const sp = computeFantasyPointsFromPlayerRow(prow);
-        const displayName = (prow?.name && String(prow.name).trim()) ? String(prow.name).trim() : stripNamePrefix(k);
-        return { key: k, displayName, sp };
-      });
 
 
       // sort within team by SP desc
@@ -190,14 +205,23 @@ if (i === 0) {
 const tdPlayer = document.createElement("td");
 tdPlayer.className = "player-cell";
 
+const isAffected = !!(p.note && p.note.trim());
+const label = isAffected ? `${p.displayName} *` : p.displayName;
+
 if (p.key) {
   const a = document.createElement("a");
   a.href = `player.html?season=${encodeURIComponent(getSeasonId())}&player_key=${encodeURIComponent(p.key)}`;
   a.className = "player-link";
-  a.textContent = p.displayName || "";
+  a.textContent = label || "";
   tdPlayer.appendChild(a);
 } else {
-  tdPlayer.textContent = p.displayName || "";
+  tdPlayer.textContent = label || "";
+}
+
+
+
+if (isAffected) {
+  tdPlayer.title = p.note;
 }
 
 tr.appendChild(tdPlayer);
