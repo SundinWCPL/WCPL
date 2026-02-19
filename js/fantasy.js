@@ -145,9 +145,13 @@ const keys = Object.keys(r)
 	  
 	  const rowCount = players.length;
 
-      const totalSp = players.reduce((sum, x) => sum + (x.sp || 0), 0);
+      const bonus = toNum(r.extra_points);
+const bonusNote = String(r.extra_points_note ?? "").trim();
 
-      return { teamName, players, totalSp, rowCount };
+const totalSpBase = players.reduce((sum, x) => sum + (x.sp || 0), 0);
+const totalSp = totalSpBase + bonus;
+
+return { teamName, players, totalSp, rowCount, bonus, bonusNote };
     });
 
   // sort overall by Total SP desc
@@ -165,13 +169,23 @@ if (i === 0) {
   tr.classList.add("team-start");
 }
 
-      if (i === 0) {
-        const tdTeam = document.createElement("td");
-        tdTeam.className = "team-cell";
-        tdTeam.rowSpan = team.rowCount;
-        tdTeam.textContent = team.teamName; // full gm_id
-        tr.appendChild(tdTeam);
-      }
+if (i === 0) {
+  const tdTeam = document.createElement("td");
+  tdTeam.className = "team-cell";
+  tdTeam.rowSpan = team.rowCount;
+
+  // NEW logic
+  let label = team.teamName;
+  if (team.bonus > 0) label += " *";
+
+  tdTeam.textContent = label;
+
+  if (team.bonus > 0) {
+    tdTeam.title = team.bonusNote || `Bonus points added: ${fmtPts(team.bonus)} FP`;
+  }
+
+  tr.appendChild(tdTeam);
+}
 
 const tdPlayer = document.createElement("td");
 tdPlayer.className = "player-cell";
@@ -228,7 +242,8 @@ function computeFantasyPointsFromPlayerRow(p) {
     toNum(p.turnovers) * -5 +
     toNum(p.entries) * 1 +
     toNum(p.exits) * 1 +
-    toNum(p.hits) * 2.5
+    toNum(p.hits) * 2.5 +
+	toNum(p.blocks) * 5
   );
 
   if (!isGoalieRow(p)) return sk;
