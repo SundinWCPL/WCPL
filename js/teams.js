@@ -83,7 +83,8 @@ function wireFilters() {
 
     const key = th.dataset.key;
     if (!key) return; // non-sortable header
-    if (elStage.value === "PO" && key === "PTS") return;
+    // In playoffs view, PTS and xPTS are not shown (we display '-')
+    if (elStage.value === "PO" && (key === "PTS" || key === "XPTS")) return;
 
     if (sortKey === key) {
       sortDir = (sortDir === "desc") ? "asc" : "desc";
@@ -229,6 +230,7 @@ function computeStandings(teamRows, gameRows, scheduleRows, boxscoreRows, season
       L: 0,     // regulation losses
       OTL: 0,
       PTS: 0,
+      XPTS: 0,
 
       GF: 0,
       GA: 0,
@@ -353,6 +355,23 @@ for (const r of (boxscoreRows || [])) {
       homeRow.xGA = (homeRow.xGA ?? 0) + axg;
       awayRow.xG  = (awayRow.xG  ?? 0) + axg;
       awayRow.xGA = (awayRow.xGA ?? 0) + hxg;
+
+      // xPTS: expected points based on xG winner; <= 1.0 xG diff counts as OT
+      const diffXg = Math.abs(hxg - axg);
+      if (diffXg === 0) {
+        homeRow.XPTS += 1.5;
+        awayRow.XPTS += 1.5;
+      } else {
+        const homeExpWin = hxg > axg;
+        const winRow = homeExpWin ? homeRow : awayRow;
+        const loseRow = homeExpWin ? awayRow : homeRow;
+        if (diffXg <= 1.0) {
+          winRow.XPTS += 2;
+          loseRow.XPTS += 1;
+        } else {
+          winRow.XPTS += 3;
+        }
+      }
     }
 
     const isOT = ot > 0;
@@ -477,6 +496,23 @@ const per15 = (n) => {
     return td;
   };
 
+  // points-like numeric cell (allows halves), but avoids showing trailing .0
+  const tdPtsSmart = (n) => {
+    const td = document.createElement("td");
+    td.className = "num";
+    if (n == null || !isFinite(n)) {
+      td.textContent = "";
+      return td;
+    }
+    const v = Number(n);
+    if (Number.isInteger(v)) {
+      td.textContent = String(v);
+    } else {
+      td.textContent = v.toFixed(1).replace(/\.0$/, "");
+    }
+    return td;
+  };
+
   const tdPct = (rate) => {
     const td = document.createElement("td");
     td.className = "num";
@@ -551,6 +587,7 @@ const per15 = (n) => {
   tr.appendChild(tdNumMaybe(r.OTL, null));
   tr.appendChild(tdNumMaybe(r.L, null));
   tr.appendChild(elStage.value === "PO" ? tdText("-", "num") : tdNumMaybe(r.PTS, null));
+  tr.appendChild(elStage.value === "PO" ? tdText("-", "num") : tdPtsSmart(r.XPTS));
 
   tr.appendChild(tdNumMaybe(gdiff, null, true));
   tr.appendChild(tdPct(shRate));
@@ -633,6 +670,7 @@ const per15 = (n) => {
     case "OTL": return r.OTL ?? 0;
     case "L": return r.L ?? 0;
     case "PTS": return r.PTS ?? 0;
+    case "XPTS": return r.XPTS ?? 0;
     case "GDIFF": return gf - ga;
     case "SH": return sh;
     case "SV": return sv;
