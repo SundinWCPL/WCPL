@@ -392,14 +392,12 @@ for (const r of (boxscoreRows || [])) {
       }
     } else {
       if (homeWin) {
-        homeRow.W += 1;
         homeRow.OTW += 1;
         homeRow.PTS += 2;
 
         awayRow.OTL += 1;
         awayRow.PTS += 1;
       } else {
-        awayRow.W += 1;
         awayRow.OTW += 1;
         awayRow.PTS += 2;
 
