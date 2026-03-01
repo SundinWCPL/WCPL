@@ -1,11 +1,4 @@
 {
-  "dependencies": {
-    "minimist": "^1.2.8",
-    "papaparse": "^5.5.3"
-  }
-}
-
-{
   "name": "wcpl-tools",
   "private": true,
   "type": "module",
@@ -14,6 +7,6 @@
   },
   "dependencies": {
     "minimist": "^1.2.8",
-    "papaparse": "^5.4.1"
+    "papaparse": "^5.5.3"
   }
 }
