@@ -1806,7 +1806,23 @@ if (role === "GOALIE") {
 }
 
   // Sort by match_id (works with your M1-G1 scheme) and take last 10
-  mine.sort((a, b) => String(a.match_id ?? "").localeCompare(String(b.match_id ?? "")));
+mine.sort((a, b) => {
+  function parseMatchId(id) {
+    const s = String(id ?? "");
+    const m = s.match(/M(\d+)-G(\d+)/i);
+    if (!m) return { m: 0, g: 0 };
+    return {
+      m: parseInt(m[1], 10),
+      g: parseInt(m[2], 10)
+    };
+  }
+
+  const A = parseMatchId(a.match_id);
+  const B = parseMatchId(b.match_id);
+
+  if (A.m !== B.m) return A.m - B.m;  // sort by match number
+  return A.g - B.g;                   // then by game number
+});
   const last10 = mine.slice(-10);
 
   // Build plot arrays (oldest -> newest so x=1 is oldest among last10)
