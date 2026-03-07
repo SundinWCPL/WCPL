@@ -26,6 +26,9 @@ const elTeamBody = document.getElementById("teamBody");
 const elTeamAnalyticsStatus = document.getElementById("teamAnalyticsStatus");
 const elTeamAnalytics = document.getElementById("teamAnalytics");
 
+let teamAnalyticsCompareMode = "LEAGUE";
+let teamAnalyticsCompareTeamId = "";
+
 boot();
 
 // -------------------- Roster sorting --------------------
@@ -235,7 +238,7 @@ renderHero(seasonId, team, rec, stageMode, poLabel);
 	lastAdvOn = advOn;
 
 	renderRoster(roster, advOn);
-	renderTeamAnalyticsRadar(teamId, games, schedule, boxscores, stageMode);
+	renderTeamAnalyticsRadar(teamId, games, schedule, boxscores, stageMode, teams, team);
 
 	elTeamBody.hidden = false;
     elHero.hidden = false;
@@ -639,7 +642,164 @@ function renderTeamMissingInSeason(seasonId, teamId, seasons) {
   elHero.classList.add("team-themed");
 }
 
-function renderTeamAnalyticsRadar(teamId, games, schedule, boxscores, stageMode) {
+
+function ensureTeamAnalyticsCompareControl() {
+  if (!elTeamAnalytics || !elTeamAnalytics.parentElement) return null;
+
+  const chartCard = elTeamAnalytics.parentElement;
+  const mount = chartCard.parentElement || chartCard;
+  let wrap = document.getElementById("teamAnalyticsCompareWrap");
+
+  if (!wrap) {
+    wrap = document.createElement("div");
+    wrap.id = "teamAnalyticsCompareWrap";
+    wrap.style.display = "flex";
+    wrap.style.justifyContent = "flex-end";
+    wrap.style.alignItems = "center";
+    wrap.style.gap = "8px";
+    wrap.style.flexWrap = "wrap";
+    wrap.style.margin = "0 0 8px auto";
+
+    const label = document.createElement("label");
+    label.htmlFor = "teamAnalyticsCompareInput";
+    label.textContent = "Compare vs";
+    label.style.fontSize = "12px";
+    label.style.opacity = "0.85";
+
+    const input = document.createElement("input");
+    input.id = "teamAnalyticsCompareInput";
+    input.type = "text";
+    input.setAttribute("list", "teamAnalyticsCompareList");
+    input.setAttribute("autocomplete", "off");
+    input.placeholder = "League Average";
+    input.style.minWidth = "220px";
+    input.style.maxWidth = "280px";
+    input.style.padding = "6px 10px";
+    input.style.borderRadius = "10px";
+    input.style.border = "1px solid rgba(255,255,255,0.16)";
+    input.style.background = "rgba(255,255,255,0.06)";
+    input.style.color = "inherit";
+
+    const list = document.createElement("datalist");
+    list.id = "teamAnalyticsCompareList";
+
+    const applySelection = () => {
+      const raw = String(input.value ?? "").trim();
+      const normalized = raw.toLowerCase();
+
+      if (!raw || normalized === "league average") {
+        teamAnalyticsCompareMode = "LEAGUE";
+        teamAnalyticsCompareTeamId = "";
+        input.value = "League Average";
+        refresh();
+        return;
+      }
+
+      const option = [...list.options].find(o => String(o.value).trim().toLowerCase() === normalized);
+      const compareId = String(option?.dataset?.teamId ?? "").trim();
+      if (compareId) {
+        teamAnalyticsCompareMode = "TEAM";
+        teamAnalyticsCompareTeamId = compareId;
+        input.value = option.value;
+      } else {
+        teamAnalyticsCompareMode = "LEAGUE";
+        teamAnalyticsCompareTeamId = "";
+        input.value = "League Average";
+      }
+      refresh();
+    };
+
+    input.addEventListener("change", applySelection);
+    input.addEventListener("keydown", (ev) => {
+      if (ev.key === "Enter") applySelection();
+    });
+    input.addEventListener("blur", applySelection);
+
+    wrap.appendChild(label);
+    wrap.appendChild(input);
+    wrap.appendChild(list);
+  }
+
+  if (wrap.parentElement !== mount || wrap.nextSibling !== chartCard) {
+    mount.insertBefore(wrap, chartCard);
+  }
+
+  return {
+    wrap,
+    input: document.getElementById("teamAnalyticsCompareInput"),
+    list: document.getElementById("teamAnalyticsCompareList")
+  };
+}
+
+function updateTeamAnalyticsCompareControl(currentTeamId, compareChoices) {
+  ensureTeamAnalyticsCompareControl();
+
+  const input = document.getElementById("teamAnalyticsCompareInput");
+  const list = document.getElementById("teamAnalyticsCompareList");
+  if (!input || !list) return;
+
+  const choices = Array.isArray(compareChoices) ? compareChoices.slice() : [];
+  list.innerHTML = "";
+
+  const leagueOpt = document.createElement("option");
+  leagueOpt.value = "League Average";
+  leagueOpt.dataset.teamId = "";
+  list.appendChild(leagueOpt);
+
+  for (const choice of choices) {
+    if (!choice || String(choice.team_id).trim() === String(currentTeamId).trim()) continue;
+    const opt = document.createElement("option");
+    opt.value = String(choice.team_name ?? choice.team_id).trim();
+    opt.dataset.teamId = String(choice.team_id ?? "").trim();
+    list.appendChild(opt);
+  }
+
+  let resolvedLabel = "League Average";
+  if (teamAnalyticsCompareMode === "TEAM" && teamAnalyticsCompareTeamId) {
+    const match = choices.find(t => String(t.team_id).trim() === String(teamAnalyticsCompareTeamId).trim());
+    if (match && String(match.team_id).trim() !== String(currentTeamId).trim()) {
+      resolvedLabel = String(match.team_name ?? match.team_id).trim();
+    } else {
+      teamAnalyticsCompareMode = "LEAGUE";
+      teamAnalyticsCompareTeamId = "";
+    }
+  }
+
+  input.value = resolvedLabel;
+}
+
+function computeAveragePctDiff(keys, baseStats, compareStats, inverseKeys) {
+  const vals = keys.map((k) => {
+    const a = Number(baseStats?.[k]);
+    const b = Number(compareStats?.[k]);
+    if (!Number.isFinite(a) || !Number.isFinite(b) || b === 0) return null;
+    return inverseKeys.has(k) ? ((b - a) / b) * 100 : ((a - b) / b) * 100;
+  }).filter(v => Number.isFinite(v));
+
+  if (!vals.length) return null;
+  return vals.reduce((sum, v) => sum + v, 0) / vals.length;
+}
+
+function buildTeamStatsMap(games, teamSecByTeam) {
+  const ids = new Set();
+  for (const g of games) {
+    const home = String(g.home_team_id ?? "").trim();
+    const away = String(g.away_team_id ?? "").trim();
+    if (home) ids.add(home);
+    if (away) ids.add(away);
+  }
+
+  const out = new Map();
+  for (const tid of ids) {
+    const teamSec = Number(teamSecByTeam?.get?.(tid) ?? 0);
+    if (!(teamSec > 0)) continue;
+    const stats = computeTeamRates(tid, games, teamSecByTeam);
+    if (stats) out.set(tid, stats);
+  }
+  return out;
+}
+
+function renderTeamAnalyticsRadar(teamId, games, schedule, boxscores, stageMode, teams, currentTeam) {
 	// Pull current team colors from CSS variables
 const rootStyles = getComputedStyle(document.documentElement);
 let teamBg = rootStyles.getPropertyValue("--team-bg").trim() || "#ff9933";
@@ -702,6 +862,7 @@ for (const [key, dur] of durByMatchTeam.entries()) {
 
   const teamStats = computeTeamRates(teamId, stageFilteredGames, teamSecByTeam);
   const leagueStats = computeLeagueRates(stageFilteredGames, teamSecByTeam);
+  const teamStatsByTeam = buildTeamStatsMap(stageFilteredGames, teamSecByTeam);
 
   // If no games, show a friendly message
 const teamSec = teamSecByTeam.get(teamId) ?? 0;
@@ -713,6 +874,34 @@ if (!teamStats || !(teamSec > 0) || !leagueStats || !(leagueStats.teamSec > 0)) 
 }
   elTeamAnalyticsStatus.hidden = true;
   elTeamAnalyticsStatus.textContent = "";
+
+  const compareChoices = (teams || [])
+    .filter(t => {
+      const tid = String(t.team_id ?? "").trim();
+      return tid && tid !== String(teamId).trim() && teamStatsByTeam.has(tid);
+    })
+    .map(t => ({
+      team_id: String(t.team_id ?? "").trim(),
+      team_name: String(t.team_name ?? t.team_id ?? "").trim(),
+    }))
+    .sort((a, b) => a.team_name.localeCompare(b.team_name));
+
+  updateTeamAnalyticsCompareControl(teamId, compareChoices);
+
+  const compareMode = (teamAnalyticsCompareMode === "TEAM" && teamAnalyticsCompareTeamId) ? "TEAM" : "LEAGUE";
+  const compareTeam = compareMode === "TEAM"
+    ? (teams || []).find(t => String(t.team_id ?? "").trim() === String(teamAnalyticsCompareTeamId).trim())
+    : null;
+  const compareTeamName = compareTeam ? String(compareTeam.team_name ?? compareTeam.team_id).trim() : "League Average";
+  const compareStats = (compareMode === "TEAM")
+    ? teamStatsByTeam.get(String(teamAnalyticsCompareTeamId).trim())
+    : leagueStats;
+
+  if (!compareStats) {
+    teamAnalyticsCompareMode = "LEAGUE";
+    teamAnalyticsCompareTeamId = "";
+    updateTeamAnalyticsCompareControl(teamId, compareChoices);
+  }
 
   // Build radar values as % of league average (league becomes a clean 100 ring)
   // This avoids unit-mismatch (e.g., shots vs %). Hover will still show raw values.
@@ -731,7 +920,7 @@ const metrics = [
   const theta = metrics.map(m => m.label);
 
 const teamRaw = metrics.map(m => teamStats[m.key]);
-const lgRaw   = metrics.map(m => leagueStats[m.key]);
+const compareRaw = metrics.map(m => (compareStats ?? leagueStats)[m.key]);
 
 // NEW: compute per-metric max across ALL TEAMS (league leaders)
 const maxByMetric = computeLeagueLeadersMax(stageFilteredGames, teamSecByTeam);
@@ -740,18 +929,18 @@ const minByMetric = computeLeagueLeadersMin(stageFilteredGames, teamSecByTeam);
 // “Lower is better” metrics:
 const inverseKeys = new Set(["ga_15", "xga_15", "sa_15"]);
 
-// ---- Update OFFENSE/DEFENSE header/footer with avg % vs league ----
+// ---- Update OFFENSE/DEFENSE header/footer with avg % vs comparator ----
 const capTop = document.querySelector(".analytics-cap-top");
 const capBot = document.querySelector(".analytics-cap-bottom");
 
 // helper: pct diff where + is always "better"
 // (inverse stats use (league-team)/league)
-const pctVsLeague = (key, teamVal, lgVal) => {
-  if (!Number.isFinite(teamVal) || !Number.isFinite(lgVal) || lgVal === 0) return null;
+const pctVsComparator = (key, teamVal, compareVal) => {
+  if (!Number.isFinite(teamVal) || !Number.isFinite(compareVal) || compareVal === 0) return null;
   const inv = inverseKeys.has(key);
   const pct = inv
-    ? ((lgVal - teamVal) / lgVal) * 100
-    : ((teamVal - lgVal) / lgVal) * 100;
+    ? ((compareVal - teamVal) / compareVal) * 100
+    : ((teamVal - compareVal) / compareVal) * 100;
   return Number.isFinite(pct) ? pct : null;
 };
 
@@ -777,12 +966,12 @@ const pctColor = (p) => {
 
 // OFFENSE: G, xG, Sh%, SF
 const offKeys = ["g_15", "xg_15", "sh_pct", "sf_15"];
-const offPcts = offKeys.map(k => pctVsLeague(k, teamStats[k], leagueStats[k]));
+const offPcts = offKeys.map(k => pctVsComparator(k, teamStats[k], (compareStats ?? leagueStats)[k]));
 const offAvg = avg(offPcts);
 
 // DEFENSE: GA, xGA, Sv%, SA
 const defKeys = ["ga_15", "xga_15", "sv_pct", "sa_15"];
-const defPcts = defKeys.map(k => pctVsLeague(k, teamStats[k], leagueStats[k]));
+const defPcts = defKeys.map(k => pctVsComparator(k, teamStats[k], (compareStats ?? leagueStats)[k]));
 const defAvg = avg(defPcts);
 
 if (capTop) {
@@ -824,21 +1013,18 @@ const scaleMetric = (key, v) => {
 
 
 const teamScaled = metrics.map((m, i) => scaleMetric(m.key, teamRaw[i]));
-const leagueScaled = metrics.map((m, i) => scaleMetric(m.key, lgRaw[i]));
+const compareScaled = metrics.map((m, i) => scaleMetric(m.key, compareRaw[i]));
 
   // Close the loop
   const thetaClosed = [...theta, theta[0]];
   const teamScaledClosed = [...teamScaled, teamScaled[0]];
-  const leagueScaledClosed = [...leagueScaled, leagueScaled[0]];
+  const compareScaledClosed = [...compareScaled, compareScaled[0]];
 
-  const teamRawClosed = [...teamRaw, teamRaw[0]];
-  const lgRawClosed   = [...lgRaw,   lgRaw[0]];
-
-  const traceLeague = {
+  const traceCompare = {
     type: "scatterpolar",
-    name: "League Average",
+    name: compareTeamName,
     theta: thetaClosed,
-    r: leagueScaledClosed,
+    r: compareScaledClosed,
     mode: "lines",
     line: { width: 2, color: "rgba(255,255,255,0.70)" },
     fill: "toself",
@@ -846,9 +1032,13 @@ const leagueScaled = metrics.map((m, i) => scaleMetric(m.key, lgRaw[i]));
     hoverinfo: "skip",
   };
 
+  // Build pretty team names for trace labels / hover header
+  const teamName = (document.getElementById("teamName")?.textContent ?? String(teamId)).trim() || String(teamId);
+  const comparatorName = compareTeamName;
+
   const traceTeam = {
     type: "scatterpolar",
-    name: "Team",
+    name: teamName,
     theta: thetaClosed,
     r: teamScaledClosed,
     mode: "lines",
@@ -858,9 +1048,6 @@ const leagueScaled = metrics.map((m, i) => scaleMetric(m.key, lgRaw[i]));
 	opacity: 0.5,
     hoverinfo: "skip",
   };
-  
-  // Build pretty team name for hover header
-const teamName = (document.getElementById("teamName")?.textContent ?? String(teamId)).trim() || String(teamId);
 
 // We only want markers on the 8 real spokes (NOT the closed-loop duplicate)
 const thetaTips = theta;          // 8 labels
@@ -877,16 +1064,10 @@ const longLabelMap = {
   "GA/15":  "Goals Against per 15",
 };
 
-const tipCustom = metrics.map((m, i) => {
-  const rawTeam = teamRaw[i];
-  const rawLg   = lgRaw[i];
-  const longLabel = longLabelMap[m.label] ?? m.label;
-  return [m.label, rawTeam, rawLg, longLabel];
-});
-
 
 const traceTeamTips = {
   type: "scatterpolar",
+  meta: comparatorName,
   theta: thetaTips,
   r: rTips,
   mode: "markers",
@@ -897,7 +1078,7 @@ const traceTeamTips = {
   },
   customdata: metrics.map((m, i) => {
   const rawTeam = teamRaw[i];
-  const rawLg   = lgRaw[i];
+  const rawCompare = compareRaw[i];
   const longLabel = longLabelMap[m.label] ?? m.label;
 
   const isPercentStat = m.key === "sh_pct" || m.key === "sv_pct";
@@ -905,10 +1086,10 @@ const traceTeamTips = {
   // Compute % difference vs league
   const isInverse = inverseKeys.has(m.key);
 
-const pctDiff = (Number.isFinite(rawTeam) && Number.isFinite(rawLg) && rawLg !== 0)
+const pctDiff = (Number.isFinite(rawTeam) && Number.isFinite(rawCompare) && rawCompare !== 0)
   ? (isInverse
-      ? ((rawLg - rawTeam) / rawLg) * 100   // lower is better
-      : ((rawTeam - rawLg) / rawLg) * 100)  // higher is better
+      ? ((rawCompare - rawTeam) / rawCompare) * 100   // lower is better
+      : ((rawTeam - rawCompare) / rawCompare) * 100)  // higher is better
   : null;
 
   const color = pctDiff == null
@@ -923,9 +1104,9 @@ const pctDiff = (Number.isFinite(rawTeam) && Number.isFinite(rawLg) && rawLg !==
     ? ""
     : rawTeam.toFixed(2) + (isPercentStat ? "%" : "");
 
-  const leagueFormatted = rawLg == null
+  const compareFormatted = rawCompare == null
     ? ""
-    : rawLg.toFixed(2) + (isPercentStat ? "%" : "");
+    : rawCompare.toFixed(2) + (isPercentStat ? "%" : "");
 
   const pctFormatted = pctDiff == null
     ? ""
@@ -934,14 +1115,14 @@ const pctDiff = (Number.isFinite(rawTeam) && Number.isFinite(rawLg) && rawLg !==
   return [
     longLabel,
     teamFormatted,
-    leagueFormatted,
+    compareFormatted,
     pctFormatted,
     color
   ];
 }),
   hovertemplate:
   `<b>%{customdata[0]}</b><br>` +
-  `%{customdata[1]} (League: %{customdata[2]})<br>` +
+  `%{customdata[1]} (%{meta}: %{customdata[2]})<br>` +
   `<span style="color:%{customdata[4]};">%{customdata[3]}</span>` +
   `<extra></extra>`,
 };
@@ -977,7 +1158,7 @@ angularaxis: {
   const config = { displayModeBar: false, responsive: true };
 
   // Plotly is loaded globally via CDN
-  Plotly.newPlot(elTeamAnalytics, [traceLeague, traceTeam, traceTeamTips], layout, config);
+  Plotly.newPlot(elTeamAnalytics, [traceCompare, traceTeam, traceTeamTips], layout, config);
 }
 
 function darkenHex(hex, amount = 0.25) {

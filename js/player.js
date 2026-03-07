@@ -29,6 +29,22 @@ const elBarsToggle = document.getElementById("playerBarsRoleToggle");
 const elBarsStatus = document.getElementById("playerBarsStatus");
 const elBarsChart = document.getElementById("playerBarsChart");
 
+const BAR_COMPARE_LEAGUE = "__LEAGUE_AVG__";
+let barsCompareState = {
+  selected: BAR_COMPARE_LEAGUE,
+  role: "SKATER",
+  candidates: [],
+  runtime: null
+};
+
+const PERF_COMPARE_LEAGUE = "__LEAGUE_AVG__";
+let perfCompareState = {
+  selected: PERF_COMPARE_LEAGUE,
+  role: "SKATER",
+  candidates: [],
+  runtime: null
+};
+
 boot();
 
 async function boot() {
@@ -1261,7 +1277,431 @@ const denom = rawDenom * 0.3;
   return `rgb(${r}, ${g}, ${b})`;
 }
 
-function renderPlayerBarsChart({ role, playerVals, leagueVals, maxes, mins, teamColor }) {
+
+function getPlayerIdentityKey(row) {
+  return String(
+    row?.player_key ??
+    row?.steam_id ??
+    row?.steamid ??
+    row?.steamID ??
+    row?.steam ??
+    row?.steam64 ??
+    normalizeName(row?.name ?? "")
+  ).trim();
+}
+
+function playerEligibleForBarsRole(row, role) {
+  const gpS = toIntMaybe(row?.gp_s) ?? 0;
+  const gpG = toIntMaybe(row?.gp_g) ?? 0;
+  const pos = normalizePosition(row?.position ?? "");
+
+  if (role === "GOALIE") {
+    return gpG > 0 || pos === "Goalie" || pos === "Skater/Goalie";
+  }
+  return gpS > 0 || pos === "Skater" || pos === "Skater/Goalie";
+}
+
+function buildBarsCompareCandidates(playersRows, teams, currentPlayer, role) {
+  const teamMap = new Map((teams || []).map(t => [String(t.team_id ?? "").trim(), t]));
+  const currentId = getPlayerIdentityKey(currentPlayer);
+  const used = new Set();
+
+  return (playersRows || [])
+    .filter(row => playerEligibleForBarsRole(row, role))
+    .filter(row => getPlayerIdentityKey(row) !== currentId)
+    .map(row => {
+      const teamId = String(row?.team_id ?? "").trim();
+      const team = teamMap.get(teamId);
+      const teamLabel =
+        String(team?.short_name ?? "").trim() ||
+        String(team?.team_name ?? "").trim() ||
+        teamId;
+
+      const baseLabel = teamLabel
+        ? `${String(row?.name ?? "").trim()} (${teamLabel})`
+        : String(row?.name ?? "").trim();
+
+      let label = baseLabel || "Unknown Player";
+      let n = 2;
+      while (used.has(label.toLowerCase())) {
+        label = `${baseLabel} #${n}`;
+        n += 1;
+      }
+      used.add(label.toLowerCase());
+
+      return { label, row };
+    })
+    .sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: "base" }));
+}
+
+
+function inferPerfCompareRole(playerRow) {
+  const gpS = toIntMaybe(playerRow?.gp_s) ?? 0;
+  const gpG = toIntMaybe(playerRow?.gp_g) ?? 0;
+  const pos = normalizePosition(playerRow?.position ?? "");
+
+  if (pos === "Goalie") return "GOALIE";
+  if (pos === "Skater") return "SKATER";
+  if (gpG > gpS && gpG > 0) return "GOALIE";
+  return "SKATER";
+}
+
+function buildPerfCompareCandidates(playersRows, teams, currentPlayer, role) {
+  return buildBarsCompareCandidates(playersRows, teams, currentPlayer, role);
+}
+
+function ensurePerfCompareControls() {
+  if (!elPerfChart || !elPerfChart.parentElement) return null;
+
+  let wrap = document.getElementById("playerPerfCompareWrap");
+  if (!wrap) {
+    wrap = document.createElement("div");
+    wrap.id = "playerPerfCompareWrap";
+    wrap.style.display = "flex";
+    wrap.style.justifyContent = "flex-end";
+    wrap.style.alignItems = "center";
+    wrap.style.gap = "8px";
+    wrap.style.flexWrap = "wrap";
+    wrap.style.margin = "0 0 8px auto";
+
+    const label = document.createElement("label");
+    label.htmlFor = "playerPerfCompareInput";
+    label.textContent = "Compare vs";
+    label.style.fontSize = "12px";
+    label.style.opacity = "0.85";
+
+    const input = document.createElement("input");
+    input.id = "playerPerfCompareInput";
+    input.setAttribute("list", "playerPerfCompareList");
+    input.setAttribute("autocomplete", "off");
+    input.placeholder = "League Average";
+    input.style.minWidth = "220px";
+    input.style.maxWidth = "280px";
+    input.style.padding = "6px 10px";
+    input.style.borderRadius = "10px";
+    input.style.border = "1px solid rgba(255,255,255,0.16)";
+    input.style.background = "rgba(255,255,255,0.06)";
+    input.style.color = "inherit";
+
+    const list = document.createElement("datalist");
+    list.id = "playerPerfCompareList";
+
+    wrap.appendChild(label);
+    wrap.appendChild(input);
+    wrap.appendChild(list);
+
+    elPerfChart.parentElement.insertBefore(wrap, elPerfChart);
+
+    const applySelection = () => {
+      const value = String(input.value ?? "").trim();
+
+      if (!value || /^league average$/i.test(value)) {
+        perfCompareState.selected = PERF_COMPARE_LEAGUE;
+        input.value = "League Average";
+        rerenderPerfChartFromState();
+        return;
+      }
+
+      const match = (perfCompareState.candidates || []).find(
+        c => c.label.toLowerCase() === value.toLowerCase()
+      );
+
+      if (match) {
+        perfCompareState.selected = match.label;
+        input.value = match.label;
+      } else {
+        perfCompareState.selected = PERF_COMPARE_LEAGUE;
+        input.value = "League Average";
+      }
+
+      rerenderPerfChartFromState();
+    };
+
+    input.addEventListener("change", applySelection);
+    input.addEventListener("keydown", (ev) => {
+      if (ev.key === "Enter") applySelection();
+    });
+    input.addEventListener("blur", applySelection);
+  }
+
+  return {
+    wrap,
+    input: document.getElementById("playerPerfCompareInput"),
+    list: document.getElementById("playerPerfCompareList")
+  };
+}
+
+function syncPerfCompareControls(role) {
+  const controls = ensurePerfCompareControls();
+  if (!controls) return;
+
+  const { wrap, input, list } = controls;
+  wrap.hidden = false;
+  perfCompareState.role = role;
+
+  const opts = [`<option value="League Average"></option>`]
+    .concat((perfCompareState.candidates || []).map(c => `<option value="${escapeHtml(c.label)}"></option>`));
+  list.innerHTML = opts.join("");
+
+  const stillValid =
+    perfCompareState.selected === PERF_COMPARE_LEAGUE ||
+    (perfCompareState.candidates || []).some(c => c.label === perfCompareState.selected);
+
+  if (!stillValid) {
+    perfCompareState.selected = PERF_COMPARE_LEAGUE;
+  }
+
+  input.value = perfCompareState.selected === PERF_COMPARE_LEAGUE
+    ? "League Average"
+    : perfCompareState.selected;
+}
+
+function computePlayerAvgSpFromBoxscores(boxRows, playerRow, role) {
+  const playerSteam =
+    String(playerRow?.steam_id ?? playerRow?.steamid ?? playerRow?.steamID ?? playerRow?.steam ?? playerRow?.steam64 ?? "").trim();
+  const playerNameNorm = normalizeName(playerRow?.name);
+
+  const vals = (boxRows || [])
+    .filter(r => {
+      const rSteam = String(r.steam_id ?? r.steamid ?? r.steamID ?? r.steam ?? r.steam64 ?? "").trim();
+      if (playerSteam && rSteam && rSteam === playerSteam) {
+        return role === "GOALIE"
+          ? String(r.position ?? "").trim().toUpperCase() === "G"
+          : String(r.position ?? "").trim().toUpperCase() !== "G";
+      }
+
+      const sameName = normalizeName(r.player_name) === playerNameNorm;
+      if (!sameName) return false;
+
+      return role === "GOALIE"
+        ? String(r.position ?? "").trim().toUpperCase() === "G"
+        : String(r.position ?? "").trim().toUpperCase() !== "G";
+    })
+    .map(r => toNumMaybe(r.sp))
+    .filter(v => v != null && Number.isFinite(v));
+
+  if (!vals.length) return null;
+  return vals.reduce((a, b) => a + b, 0) / vals.length;
+}
+
+function getPerfCompareTarget(runtime, role) {
+  if (!runtime) {
+    return { baseline: null, compareLabel: "League Average" };
+  }
+
+  const leagueBaseline = role === "GOALIE"
+    ? (runtime.leagueAvgGoalie > 0 ? runtime.leagueAvgGoalie : runtime.leagueAvgAll)
+    : (runtime.leagueAvgSkater > 0 ? runtime.leagueAvgSkater : runtime.leagueAvgAll);
+
+  if (perfCompareState.selected === PERF_COMPARE_LEAGUE) {
+    return {
+      baseline: leagueBaseline,
+      compareLabel: "League Average"
+    };
+  }
+
+  const match = (perfCompareState.candidates || []).find(c => c.label === perfCompareState.selected);
+  if (!match) {
+    return {
+      baseline: leagueBaseline,
+      compareLabel: "League Average"
+    };
+  }
+
+  const playerBaseline = computePlayerAvgSpFromBoxscores(runtime.rows || [], match.row, role);
+
+  return {
+    baseline: (playerBaseline != null && Number.isFinite(playerBaseline) && playerBaseline > 0)
+      ? playerBaseline
+      : leagueBaseline,
+    compareLabel: match.label
+  };
+}
+
+function rerenderPerfChartFromState() {
+  const runtime = perfCompareState.runtime;
+  if (!runtime) return;
+  return renderGameLog(
+    runtime.seasonId,
+    runtime.advOn,
+    runtime.stage,
+    runtime.teams,
+    runtime.schedule,
+    runtime.pSeason,
+    runtime.players,
+    runtime.roleSplitSeason
+  );
+}
+
+function ensureBarsCompareControls() {
+  if (!elBarsChart || !elBarsChart.parentElement) return null;
+
+  let wrap = document.getElementById("playerBarsCompareWrap");
+  if (!wrap) {
+    wrap = document.createElement("div");
+    wrap.id = "playerBarsCompareWrap";
+    wrap.style.display = "flex";
+    wrap.style.justifyContent = "flex-end";
+    wrap.style.alignItems = "center";
+    wrap.style.gap = "8px";
+    wrap.style.flexWrap = "wrap";
+    wrap.style.margin = "0 0 8px auto";
+
+    const label = document.createElement("label");
+    label.htmlFor = "playerBarsCompareInput";
+    label.textContent = "Compare vs";
+    label.style.fontSize = "12px";
+    label.style.opacity = "0.85";
+
+    const input = document.createElement("input");
+    input.id = "playerBarsCompareInput";
+    input.setAttribute("list", "playerBarsCompareList");
+    input.setAttribute("autocomplete", "off");
+    input.placeholder = "League Average";
+    input.style.minWidth = "220px";
+    input.style.maxWidth = "280px";
+    input.style.padding = "6px 10px";
+    input.style.borderRadius = "10px";
+    input.style.border = "1px solid rgba(255,255,255,0.16)";
+    input.style.background = "rgba(255,255,255,0.06)";
+    input.style.color = "inherit";
+
+    const list = document.createElement("datalist");
+    list.id = "playerBarsCompareList";
+
+    wrap.appendChild(label);
+    wrap.appendChild(input);
+    wrap.appendChild(list);
+
+    elBarsChart.parentElement.insertBefore(wrap, elBarsChart);
+
+    const applySelection = () => {
+      const value = String(input.value ?? "").trim();
+
+      if (!value || /^league average$/i.test(value)) {
+        barsCompareState.selected = BAR_COMPARE_LEAGUE;
+        input.value = "League Average";
+        rerenderPlayerBarsFromState();
+        return;
+      }
+
+      const match = (barsCompareState.candidates || []).find(
+        c => c.label.toLowerCase() === value.toLowerCase()
+      );
+
+      if (match) {
+        barsCompareState.selected = match.label;
+        input.value = match.label;
+      } else {
+        barsCompareState.selected = BAR_COMPARE_LEAGUE;
+        input.value = "League Average";
+      }
+
+      rerenderPlayerBarsFromState();
+    };
+
+    input.addEventListener("change", applySelection);
+    input.addEventListener("keydown", (ev) => {
+      if (ev.key === "Enter") applySelection();
+    });
+    input.addEventListener("blur", applySelection);
+  }
+
+  return {
+    wrap,
+    input: document.getElementById("playerBarsCompareInput"),
+    list: document.getElementById("playerBarsCompareList")
+  };
+}
+
+function syncBarsCompareControls(role) {
+  const controls = ensureBarsCompareControls();
+  if (!controls) return;
+
+  const { wrap, input, list } = controls;
+  wrap.hidden = false;
+  barsCompareState.role = role;
+
+  const opts = [`<option value="League Average"></option>`]
+    .concat((barsCompareState.candidates || []).map(c => `<option value="${escapeHtml(c.label)}"></option>`));
+  list.innerHTML = opts.join("");
+
+  const stillValid =
+    barsCompareState.selected === BAR_COMPARE_LEAGUE ||
+    (barsCompareState.candidates || []).some(c => c.label === barsCompareState.selected);
+
+  if (!stillValid) {
+    barsCompareState.selected = BAR_COMPARE_LEAGUE;
+  }
+
+  input.value = barsCompareState.selected === BAR_COMPARE_LEAGUE
+    ? "League Average"
+    : barsCompareState.selected;
+}
+
+function getBarsCompareTarget(runtime, role) {
+  if (!runtime) {
+    return {
+      compareVals: role === "GOALIE" ? null : null,
+      compareLabel: "League Avg"
+    };
+  }
+
+  if (barsCompareState.selected === BAR_COMPARE_LEAGUE) {
+    return {
+      compareVals: role === "GOALIE" ? runtime.league.goalie : runtime.league.skater,
+      compareLabel: "League Avg"
+    };
+  }
+
+  const match = (barsCompareState.candidates || []).find(c => c.label === barsCompareState.selected);
+  if (!match) {
+    return {
+      compareVals: role === "GOALIE" ? runtime.league.goalie : runtime.league.skater,
+      compareLabel: "League Avg"
+    };
+  }
+
+  const compareRoleSplit = computeRoleSplitFromBoxscores(runtime.boxRows || [], match.row);
+  const compareAll = readPlayerPer15FromSeasonRow(match.row, runtime.advOn, compareRoleSplit);
+
+  return {
+    compareVals: role === "GOALIE" ? compareAll.goalie : compareAll.skater,
+    compareLabel: match.label
+  };
+}
+
+function rerenderPlayerBarsFromState() {
+  const runtime = barsCompareState.runtime;
+  if (!runtime || !window.Plotly || !elBarsChart) return;
+
+  const role = barsCompareState.role || "SKATER";
+  const { compareVals, compareLabel } = getBarsCompareTarget(runtime, role);
+  const teamColor = resolveTeamColorForBars();
+
+  if (role === "GOALIE") {
+    renderPlayerBarsChart({
+      role: "GOALIE",
+      playerVals: runtime.player.goalie,
+      leagueVals: compareVals,
+      compareLabel,
+      maxes: runtime.maxesGoalie,
+      mins: runtime.minsGoalie,
+      teamColor
+    });
+  } else {
+    renderPlayerBarsChart({
+      role: "SKATER",
+      playerVals: runtime.player.skater,
+      leagueVals: compareVals,
+      compareLabel,
+      maxes: runtime.maxesSkater,
+      teamColor
+    });
+  }
+}
+
+function renderPlayerBarsChart({ role, playerVals, leagueVals, maxes, mins, teamColor, compareLabel = "League Avg" }) {
   if (!elBarsChart || !window.Plotly) return;
 
   const metrics = buildPlayerBarsMetrics({
@@ -1460,7 +1900,7 @@ const traceLeague = {
   customdata: custom,
 hovertemplate:
   `<b>%{customdata[0]}</b><br>` +
-  `%{customdata[1]} (League Avg: %{customdata[2]})<br>` +
+  `%{customdata[1]} (${escapeHtml(compareLabel)}: %{customdata[2]})<br>` +
   `<span style="font-weight:700;">%{customdata[3]}</span>` +
   `<extra></extra>`,
 hoverlabel: {
@@ -1478,7 +1918,7 @@ hoverlabel: {
     customdata: custom,
 hovertemplate:
   `<b>%{customdata[0]}</b><br>` +
-  `%{customdata[1]} (League Avg: %{customdata[2]})<br>` +
+  `%{customdata[1]} (${escapeHtml(compareLabel)}: %{customdata[2]})<br>` +
   `<span style="font-weight:700;">%{customdata[3]}</span>` +
   `<extra></extra>`,
 hoverlabel: {
@@ -1644,6 +2084,21 @@ async function renderGameLog(seasonId, advOn, stage, teams, schedule, pSeason, p
     String(pSeason.steam_id ?? pSeason.steamid ?? pSeason.steamID ?? pSeason.steam ?? pSeason.steam64 ?? "").trim();
   const playerNameNorm = normalizeName(pSeason.name);
 
+  const perfRole = inferPerfCompareRole(pSeason);
+  perfCompareState.runtime = {
+    seasonId,
+    advOn,
+    stage,
+    teams,
+    schedule,
+    pSeason,
+    players,
+    roleSplitSeason,
+    rows
+  };
+  perfCompareState.candidates = buildPerfCompareCandidates(players, teams, pSeason, perfRole);
+  syncPerfCompareControls(perfRole);
+
   // League average SP per appearance, split by role (skater vs goalie)
 function isGoaliePosRow(r) {
   return String(r.position ?? "").trim().toUpperCase() === "G";
@@ -1665,6 +2120,15 @@ const leagueAvgGoalie = spGoalies.length ? (spGoalies.reduce((a,b)=>a+b,0) / spG
 // Fallback (in case early season has 0 goalie or 0 skater samples)
 const spAll = [...spSkaters, ...spGoalies];
 const leagueAvgAll = spAll.length ? (spAll.reduce((a,b)=>a+b,0) / spAll.length) : 0;
+
+const perfCompareTarget = getPerfCompareTarget({
+  rows,
+  leagueAvgSkater,
+  leagueAvgGoalie,
+  leagueAvgAll
+}, perfRole);
+const perfCompareBaseline = perfCompareTarget.baseline;
+const perfCompareLabel = perfCompareTarget.compareLabel;
   
 // --- Option B: percent above/below league average ---
 // y% = (SP - leagueAvg) / leagueAvg * 100
@@ -1691,9 +2155,7 @@ const pctAll = rows
     const sp = toNumMaybe(r.sp);
     if (sp == null || !Number.isFinite(sp)) return null;
 
-    const baseline = isGoaliePosRow(r)
-      ? (leagueAvgGoalie > 0 ? leagueAvgGoalie : leagueAvgAll)
-      : (leagueAvgSkater > 0 ? leagueAvgSkater : leagueAvgAll);
+    const baseline = perfCompareBaseline;
 
     if (!baseline || baseline === 0) return null;
     return ((sp - baseline) / baseline) * 100;
@@ -1726,9 +2188,13 @@ try {
   if (!advOn) {
     if (elBarsStatus) elBarsStatus.textContent = `No stats for Season ${seasonId}.`;
     if (elBarsChart) elBarsChart.innerHTML = "";
+    const barsCompareWrap = document.getElementById("playerBarsCompareWrap");
+    if (barsCompareWrap) barsCompareWrap.hidden = true;
   } else if (!window.Plotly) {
     if (elBarsStatus) elBarsStatus.textContent = `Plotly failed to load.`;
     if (elBarsChart) elBarsChart.innerHTML = "";
+    const barsCompareWrap = document.getElementById("playerBarsCompareWrap");
+    if (barsCompareWrap) barsCompareWrap.hidden = true;
   } else {
     const league = computeLeagueAveragesFromBoxscores(rows);
     const player = readPlayerPer15FromSeasonRow(pSeason, advOn, roleSplitSeason);
@@ -1762,18 +2228,10 @@ try {
             elBarsToggle.dataset.role = r;
             setSegActive(elBarsToggle, r);
             const teamColor = resolveTeamColorForBars();
-            if (r === "GOALIE") {
-              renderPlayerBarsChart({
-  role: "GOALIE",
-  playerVals: player.goalie,
-  leagueVals: league.goalie,
-  maxes: maxesGoalie,
-  mins: minsGoalie,
-  teamColor
-});
-            } else {
-              renderPlayerBarsChart({ role: "SKATER", playerVals: player.skater, leagueVals: league.skater, maxes: maxesSkater, teamColor });
-            }
+            barsCompareState.role = r;
+            barsCompareState.candidates = buildBarsCompareCandidates(seasonPlayers, teams, pSeason, r);
+            syncBarsCompareControls(r);
+            rerenderPlayerBarsFromState();
           });
         }
 
@@ -1783,26 +2241,28 @@ try {
       }
     }
 
-    const teamColor = resolveTeamColorForBars();
+    barsCompareState.runtime = {
+      advOn,
+      boxRows: rows,
+      league,
+      player,
+      maxesSkater,
+      maxesGoalie,
+      minsGoalie
+    };
+    barsCompareState.role = role;
+    barsCompareState.candidates = buildBarsCompareCandidates(seasonPlayers, teams, pSeason, role);
+    syncBarsCompareControls(role);
 
     if (elBarsStatus) elBarsStatus.textContent = "";
-if (role === "GOALIE") {
-  renderPlayerBarsChart({
-    role: "GOALIE",
-    playerVals: player.goalie,
-    leagueVals: league.goalie,
-    maxes: maxesGoalie,
-    mins: minsGoalie,
-    teamColor
-  });
-} else {
-  renderPlayerBarsChart({ role: "SKATER", playerVals: player.skater, leagueVals: league.skater, maxes: maxesSkater, teamColor });
-}
+    rerenderPlayerBarsFromState();
   }
 } catch (e) {
   console.warn("Player bars chart failed:", e);
   if (elBarsStatus) elBarsStatus.textContent = "Analytics chart unavailable.";
   if (elBarsChart) elBarsChart.innerHTML = "";
+  const barsCompareWrap = document.getElementById("playerBarsCompareWrap");
+  if (barsCompareWrap) barsCompareWrap.hidden = true;
 }
 
   // Sort by match_id (works with your M1-G1 scheme) and take last 10
@@ -1856,10 +2316,7 @@ const oppName = (oppTeamId || "UNKNOWN");
 const sp = toNumMaybe(r.sp);
 const spDisp = (sp != null && Number.isFinite(sp)) ? sp : null;
 
-let baseline = isGoaliePosRow(r)
-  ? (leagueAvgGoalie > 0 ? leagueAvgGoalie : leagueAvgAll)
-  : (leagueAvgSkater > 0 ? leagueAvgSkater : leagueAvgAll);
-
+let baseline = perfCompareBaseline;
 if (!baseline || baseline === 0) baseline = leagueAvgAll;
 
 const yPct = (spDisp == null || !baseline || baseline === 0)
@@ -2000,13 +2457,13 @@ const avgPerf =
 let avgPerfText;
 
 if (avgPerf == null) {
-  avgPerfText = "Average Performance (Last 10 Games): —";
+  avgPerfText = `Average Performance vs ${escapeHtml(perfCompareLabel)} (Last 10 Games): —`;
 } else {
   const pctStr = `${avgPerf >= 0 ? "+" : ""}${avgPerf.toFixed(1)}%`;
   const color = perfToColor(avgPerf);
 
   avgPerfText =
-    `Average Performance (Last 10 Games): ` +
+    `Average Performance vs ${escapeHtml(perfCompareLabel)} (Last 10 Games): ` +
     `<span style="font-weight:700; color:${color};">${pctStr}</span>`;
 }
 
@@ -2061,7 +2518,7 @@ const avgLineTrace = {
   y: [0, 0],
   line: { width: 8, color: "rgba(0,0,0,0)" }, // invisible but hoverable
   hoverinfo: "text",
-  text: ["League Average Performance", "League Average Performance"],
+  text: [`${perfCompareLabel} Performance`, `${perfCompareLabel} Performance`],
   showlegend: false
 };
 
