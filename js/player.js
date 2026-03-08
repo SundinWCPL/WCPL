@@ -901,63 +901,599 @@ function fmtSignedPct(p, dec = 1) {
   return `${v >= 0 ? "+" : ""}${v.toFixed(dec)}%`;
 }
 
-// NOTE: user specifically said *Takeaways* is inverted (lower is better)
-const INVERT_KEYS_PLAYERBARS = new Set(["turnovers_15", "ga_15"]);
+// ========================= Performance DNA config =========================
+// Tune these weights however you like. Category weights are normalized
+// within each category automatically, so the values do not strictly need
+// to sum to 1 — but keeping them around 0..1 is easiest to reason about.
 
-const OFFENSE_KEYS_PLAYERBARS = [
-  "g_15",
-  "a_15",
-  "xg_15",
-  "shots_15",
-  "shp",
-  "passes_15",
-  "entries_15",
-  "possession_15", // will auto-skip if missing
-];
-
-const DEFENSE_KEYS_PLAYERBARS = [
-  "takeaways_15",
+const INVERT_KEYS_PLAYERBARS = new Set([
   "turnovers_15",
-  "blocks_15",
-  "exits_15",
-];
-
-const GOALIE_KEYS_PLAYERBARS = [
-  "sv_15",
+  "offensive_turnovers_15",
+  "defensive_turnovers_15",
   "ga_15",
-  "svp",
-  "gsax_15",
-  "passes_15",
-];
+]);
 
-function pctVsLeague(key, playerVal, lgVal) {
-  if (!Number.isFinite(playerVal) || !Number.isFinite(lgVal) || lgVal === 0) return null;
-  const inv = INVERT_KEYS_PLAYERBARS.has(key);
-  return inv
-    ? ((lgVal - playerVal) / lgVal) * 100
-    : ((playerVal - lgVal) / lgVal) * 100;
+const SIGNED_KEYS_PLAYERBARS = new Set([
+  "gfax_15",
+  "gsax_15",
+]);
+
+const PLAYER_BARS_DELTA_CAP = 300;   // max absolute % contribution for normal stats
+const PLAYER_BARS_SIGNED_SCALE = 100; // signed diff stats like GFAx/GSAx use raw diff * this
+const PLAYER_BARS_WEIGHT_VISUAL_STRENGTH = 0.40; // 0 = no visual weight scaling, 1 = strongest
+
+const PLAYER_BARS_CONFIG = {
+  skater: [
+    {
+      key: "scoring",
+      label: "Scoring",
+      stats: [
+        { key: "g_15", label: "G/15", long: "Goals per 15", kind: "num", weight: 1 },
+        { key: "xg_15", label: "xG/15", long: "Expected Goals per 15", kind: "num", weight: 0.5 },
+        { key: "shots_15", label: "S/15", long: "Shots per 15", kind: "num", weight: 0.25 },
+        { key: "gfax_15", label: "GFAx/15", long: "Goals For Above Expected per 15", kind: "num", weight: 0.40 },
+      ]
+    },
+    {
+      key: "playmaking",
+      label: "Playmaking",
+      stats: [
+        { key: "a_15", label: "A/15", long: "Assists per 15", kind: "num", weight: 0.70 },
+        { key: "offensive_passes_15", label: "OPASS/15", long: "Offensive Passes per 15", kind: "num", weight: 0.5 },
+        { key: "entries_15", label: "ENT/15", long: "Entries per 15", kind: "num", weight: 0.25 },
+        { key: "offensive_takeaways_15", label: "OTA/15", long: "Offensive Takeaways per 15", kind: "num", weight: 0.3 },
+        { key: "offensive_turnovers_15", label: "OTO/15", long: "Offensive Turnovers per 15", kind: "num", weight: 0.15 },
+      ]
+    },
+    {
+      key: "possession",
+      label: "Possession",
+      stats: [
+        { key: "takeaways_15", label: "TA/15", long: "Takeaways per 15", kind: "num", weight: 0.50 },
+        { key: "turnovers_15", label: "TO/15", long: "Turnovers per 15", kind: "num", weight: 0.50 },
+        { key: "possession_15", label: "POSS/15", long: "Possession per 15 (min)", kind: "num", weight: 0.50 },
+        { key: "passes_15", label: "PASS/15", long: "Passes per 15", kind: "num", weight: 0.30 },
+        { key: "entries_15", label: "ENT/15", long: "Entries per 15", kind: "num", weight: 0.30 },
+        { key: "exits_15", label: " EXT/15", long: "Exits per 15", kind: "num", weight: 0.30 },
+      ]
+    },
+    {
+      key: "defense",
+      label: "Defense",
+      stats: [
+        { key: "defensive_takeaways_15", label: "DTA/15", long: "Defensive Takeaways per 15", kind: "num", weight: 0.75 },
+        { key: "defensive_turnovers_15", label: "DTO/15", long: "Defensive Turnovers per 15", kind: "num", weight: 0.30 },
+        { key: "exits_15", label: "EXT/15", long: "Exits per 15", kind: "num", weight: 0.50 },
+        { key: "defensive_passes_15", label: "DPASS/15", long: "Defensive Passes per 15", kind: "num", weight: 0.25 },
+        { key: "blocks_15", label: "BLK/15", long: "Blocks per 15", kind: "num", weight: 0.50 },
+        { key: "hits_15", label: "HIT/15", long: "Hits per 15", kind: "num", weight: 0.10 },
+      ]
+    },
+  ],
+  goalie: [
+    {
+      key: "goaltending",
+      label: "Goaltending",
+      stats: [
+        { key: "sv_15", label: "SV/15", long: "Saves per 15", kind: "num", weight: 0.15 },
+        { key: "svp", label: "SV%", long: "Save Percentage", kind: "pct", weight: 0.30 },
+        { key: "gsax_15", label: "GSAx/15", long: "Goals Saved Above Expected per 15", kind: "num", weight: 0.30 },
+        { key: "ga_15", label: "GA/15", long: "Goals Against per 15", kind: "num", weight: 0.20 },
+        { key: "passes_15", label: "PASS/15", long: "Passes per 15", kind: "num", weight: 0.05 },
+      ]
+    }
+  ]
+};
+
+const PLAYER_ARCHETYPE_CONFIG = {
+skater: {
+  dominant_gap: 10,
+  balanced_gap: 8,
+  forward: {
+    sniper_gap: 40,
+    playmaker_gap: 10,
+    two_way_gap: 30,
+    dual_threat_gap: 50,
+  },
+  defense: {
+    defensive_gap: 35,
+    offensive_gap: 8,
+    all_around_gap: 50,
+  },
+  rating_weights: {
+    "Sniper":                 { scoring: 0.50, playmaking: 0.15, possession: 0.20, defense: 0.15 },
+    "Playmaker":              { scoring: 0.10, playmaking: 0.50, possession: 0.30, defense: 0.10 },
+    "Dual Threat":            { scoring: 0.40, playmaking: 0.40, possession: 0.15, defense: 0.05 },
+    "2-Way Forward":          { scoring: 0.25, playmaking: 0.25, possession: 0.25, defense: 0.25 },
+    "Forward":                { scoring: 0.30, playmaking: 0.30, possession: 0.20, defense: 0.20 },
+
+    "Offensive Defenseman":   { scoring: 0.15, playmaking: 0.30, possession: 0.30, defense: 0.25 },
+    "Defensive Defenseman":   { scoring: 0.05, playmaking: 0.10, possession: 0.30, defense: 0.55 },
+    "All Around Defenseman":  { scoring: 0.10, playmaking: 0.20, possession: 0.30, defense: 0.40 },
+    "Defenseman":             { scoring: 0.10, playmaking: 0.20, possession: 0.35, defense: 0.35 },
+
+    "Skater":                 { scoring: 0.25, playmaking: 0.25, possession: 0.25, defense: 0.25 },
+  }
+},
+  goalie: {
+    stick_share_threshold: 0.80,
+    body_share_threshold: 0.30,
+  },
+  rating_thresholds: {
+    superstar: 60,
+    elite: 35,
+    impact: 15,
+    average: -15,
+    plug: -30,
+    pylon: -50,
+  },
+  rating_colors: {
+    Superstar: "#d4af37",
+    Elite: "#39d353",
+    Impact: "#4caf50",
+    Average: "#e7e7e7",
+    Plug: "#be8737",
+    Pylon: "#ff5252",
+    Benchwarmer: "#b71c1c",
+  }
+};
+
+function computeCategoryPctMap(role, playerVals, leagueVals) {
+  const hasPossession = role === "SKATER" && (playerVals?.possession_15 != null || leagueVals?.possession_15 != null);
+  const categories = buildPlayerBarsCategories({ role, hasPossession });
+  const out = Object.create(null);
+
+  for (const cat of categories) {
+    out[cat.key] = weightedPctDiffVsLeague(cat.stats, playerVals, leagueVals);
+  }
+  return out;
 }
 
-function avgPctDiffVsLeague(keys, playerVals, leagueVals) {
-  let sum = 0;
-  let count = 0;
+function normalizeDetailedSkaterPosition(posRaw) {
+  const s = String(posRaw ?? "").trim().toUpperCase();
 
-  for (const k of keys) {
-    const p = safeNum(playerVals?.[k]);
-    const lg = safeNum(leagueVals?.[k]);
+  if (!s) return null;
 
-let pct = pctVsLeague(k, p, lg); // already handles invert keys
-if (pct == null) continue;
+  // Forward buckets
+  if (["C", "LW", "RW", "F", "LF", "RF"].includes(s)) return "F";
 
-// Cap only negative contribution (prevents e.g. 0 vs 0.33 => -100% from dominating)
-const NEG_CAP = -50;   // <- tune this (e.g. -40, -50, -60)
-if (pct < NEG_CAP) pct = NEG_CAP;
+  // Defense buckets
+  if (["D", "LD", "RD", "DL", "DR"].includes(s)) return "D";
 
-sum += pct;
-count++;
+  // Generic site-wide labels
+  if (s === "SKATER") return null;
+  if (s === "S") return null;
+  if (s === "S/G" || s === "G/S") return null;
+  if (s === "G" || s === "GOALIE") return null;
+
+  return null;
+}
+
+function inferPrimarySkaterPositionGroupFromBoxscores(boxRows, pSeason) {
+  const playerSteam =
+    String(pSeason?.steam_id ?? pSeason?.steamid ?? pSeason?.steamID ?? pSeason?.steam ?? pSeason?.steam64 ?? "").trim();
+  const playerNameNorm = normalizeName(pSeason?.name);
+
+  const counts = { F: 0, D: 0 };
+
+  for (const r of (boxRows || [])) {
+    const rSteam = String(r.steam_id ?? r.steamid ?? r.steamID ?? r.steam ?? r.steam64 ?? "").trim();
+    const samePlayer =
+      (playerSteam && rSteam && playerSteam === rSteam) ||
+      normalizeName(r.player_name) === playerNameNorm;
+
+    if (!samePlayer) continue;
+
+    const rawPos = String(r.position ?? "").trim().toUpperCase();
+    if (rawPos === "G") continue;
+
+    const group = normalizeDetailedSkaterPosition(rawPos);
+    if (group === "F") counts.F += 1;
+    if (group === "D") counts.D += 1;
   }
 
-  return count > 0 ? (sum / count) : null;
+  if (counts.F === 0 && counts.D === 0) {
+    return normalizeDetailedSkaterPosition(pSeason?.position);
+  }
+
+  return counts.D > counts.F ? "D" : "F";
+}
+
+function skaterArchetypeFromCategories(categoryPct, posGroup) {
+  const cfg = PLAYER_ARCHETYPE_CONFIG.skater;
+
+  // General-purpose tolerance for "close enough" comparisons.
+  // Example: if balanced_gap = 8, then a category can trail another by up to 8
+  // and still be treated as reasonably comparable.
+  const bal = cfg.balanced_gap;
+
+  // Category scores (already converted to percentile-style deltas elsewhere).
+  const s = safeNum(categoryPct?.scoring) ?? -999;
+  const p = safeNum(categoryPct?.playmaking) ?? -999;
+  const c = safeNum(categoryPct?.possession) ?? -999;
+  const d = safeNum(categoryPct?.defense) ?? -999;
+
+  // ===========================================================================
+  // FORWARDS
+  // ===========================================================================
+  // Forward archetypes:
+  // - Sniper: scoring clearly leads
+  // - Playmaker: playmaking clearly leads
+  // - Dual Threat: scoring + playmaking are both strong and close together
+  // - 2-Way Forward: scoring + defense are both strong and close together
+  // - Forward: catch-all
+  if (posGroup === "F") {
+    const sniperGap = cfg.forward.sniper_gap;
+    const playmakerGap = cfg.forward.playmaker_gap;
+    const dualThreatGap = cfg.forward.dual_threat_gap;
+    const twoWayGap = cfg.forward.two_way_gap;
+
+    // Dual Threat:
+    // Scoring and playmaking are both real strengths and reasonably close together.
+    // This is for offensive forwards who can both finish and create, but do not
+    // have the defensive profile to be called a true 2-way forward.
+    //
+    // Important: this check comes BEFORE Sniper / Playmaker on purpose.
+    // If a player is elite in both scoring and playmaking, we want "Dual Threat"
+    // to win instead of forcing them into a more one-dimensional label.
+    //
+    // Tuning notes:
+    // - Increase dual_threat_gap to create more dual-threat forwards
+    // - Decrease dual_threat_gap to make this label stricter
+    // - The defensive check keeps strong defensive forwards from being classified
+    //   here when they should really fall into 2-Way Forward instead
+    if (
+      s > 0 &&
+      p > 0 &&
+      Math.abs(s - p) <= dualThreatGap &&
+      d < s - bal &&
+      d < p - bal
+    ) {
+      return "Dual Threat";
+    }
+
+    // Sniper:
+    // Scoring must clearly beat playmaking and defense.
+    // We intentionally do NOT require scoring to beat possession by sniper_gap,
+    // because possession is more about overall puck control / style than pure finishing.
+    if (
+      s >= p + sniperGap &&
+      s >= d + sniperGap
+    ) {
+      return "Sniper";
+    }
+
+    // Playmaker:
+    // Playmaking must clearly beat scoring and defense.
+    // We intentionally do NOT require playmaking to beat possession by playmaker_gap,
+    // because possession should inform the profile without blocking playmaker labels.
+    if (
+      p >= s + playmakerGap &&
+      p >= d + playmakerGap
+    ) {
+      return "Playmaker";
+    }
+
+    // 2-Way Forward:
+    // Defense and scoring should both be meaningful and reasonably close together.
+    // This is meant to catch players who contribute offensively while still having
+    // a real defensive profile, not just pure scorers.
+    //
+    // Tuning notes:
+    // - Increase twoWayGap to create more 2-way forwards
+    // - Decrease twoWayGap to make this label stricter
+    // - balanced_gap helps decide how forgiving we are relative to playmaking
+    if (
+      d > 0 &&
+      s > 0 &&
+      Math.abs(d - s) <= twoWayGap &&
+      d >= p - bal
+    ) {
+      return "2-Way Forward";
+    }
+
+    // Default forward bucket.
+    return "Forward";
+  }
+
+  // ===========================================================================
+  // DEFENSEMEN
+  // ===========================================================================
+  // Defense archetypes:
+  // - Defensive Defenseman: defense + possession are both positive and clearly ahead of offense
+  // - All Around Defenseman: all four categories are in roughly the same neighborhood
+  // - Offensive Defenseman: scoring and/or playmaking are meaningfully positive
+  // - Defenseman: catch-all
+    if (posGroup === "D") {
+  const allAroundGap = cfg.defense.all_around_gap;
+
+  // Offensive Defenseman:
+  // Possession must be positive, and either scoring or playmaking
+  // must be higher than defense.
+  if (
+    c > 0 &&
+    (s > d || p > d)
+  ) {
+    return "Offensive Defenseman";
+  }
+
+  // Defensive Defenseman:
+  // Defense must be positive and higher than every other category.
+  // Possession must also be positive.
+  if (
+    d > 0 &&
+    c > 0 &&
+    d > s &&
+    d > p &&
+    d > c
+  ) {
+    return "Defensive Defenseman";
+  }
+
+  // All Around Defenseman:
+  // Possession and defense must both be positive.
+  // Then either scoring OR playmaking has to sit within allAroundGap
+  // of both possession and defense.
+  //
+  // This creates a balanced D bucket without requiring both offense
+  // categories to be strong at the same time.
+  if (c > 0 && d > 0) {
+    const scoringFits =
+      Math.abs(s - c) <= allAroundGap &&
+      Math.abs(s - d) <= allAroundGap;
+
+    const playmakingFits =
+      Math.abs(p - c) <= allAroundGap &&
+      Math.abs(p - d) <= allAroundGap;
+
+    if (scoringFits || playmakingFits) {
+      return "All Around Defenseman";
+    }
+  }
+
+  return "Defenseman";
+}
+
+  // ===========================================================================
+  // FALLBACK (UNKNOWN SKATER POSITION)
+  // ===========================================================================
+  // If we do not know whether the player is a forward or defenseman, we fall back
+  // to a position-blind logic. This is less ideal, but still gives a reasonable
+  // result instead of failing.
+  //
+  // dominant_gap = "how much one category must clearly lead"
+  // balanced_gap = "how close categories can be and still count as similar"
+
+  // Strong scoring lead -> Sniper
+  if (
+    s >= p + cfg.dominant_gap &&
+    s >= c + cfg.dominant_gap &&
+    s >= d + cfg.dominant_gap
+  ) {
+    return "Sniper";
+  }
+
+  // Strong playmaking lead -> Playmaker
+  if (
+    p >= s + cfg.dominant_gap &&
+    p >= c + cfg.dominant_gap &&
+    p >= d + cfg.dominant_gap
+  ) {
+    return "Playmaker";
+  }
+
+  // Strong defense lead -> Defensive Defenseman
+  if (
+    d >= s + cfg.dominant_gap &&
+    d >= p + cfg.dominant_gap &&
+    d >= c + cfg.dominant_gap
+  ) {
+    return "Defensive Defenseman";
+  }
+
+  // Balanced scoring + playmaking -> Dual Threat
+  if (
+    s > 0 &&
+    p > 0 &&
+    Math.abs(s - p) <= bal &&
+    d < s - bal &&
+    d < p - bal
+  ) {
+    return "Dual Threat";
+  }
+
+  // Balanced offense-driving profile -> Offensive Defenseman
+  // Requires possession + playmaking + some scoring support.
+  if (
+    c > 0 &&
+    p > 0 &&
+    s > 0 &&
+    c >= d - bal &&
+    p >= d - bal &&
+    s >= d - bal
+  ) {
+    return "Offensive Defenseman";
+  }
+
+  // Balanced defense + possession -> All Around Defenseman
+  if (
+    d > 0 &&
+    c > 0 &&
+    Math.abs(d - c) <= bal
+  ) {
+    return "All Around Defenseman";
+  }
+
+  // Balanced scoring + defense -> 2-Way Forward
+  if (
+    s > 0 &&
+    d > 0 &&
+    Math.abs(s - d) <= bal
+  ) {
+    return "2-Way Forward";
+  }
+
+  // Final fallback if nothing else fits.
+  return "Skater";
+}
+
+function goalieArchetypeFromSeasonRow(pSeason) {
+  const stick = safeNum(pSeason?.stick_sv) ?? 0;
+  const body = safeNum(pSeason?.body_sv) ?? 0;
+  const total = stick + body;
+
+  if (total <= 0) return "Hybrid";
+
+  const stickShare = stick / total;
+  const bodyShare = body / total;
+
+  if (stickShare >= PLAYER_ARCHETYPE_CONFIG.goalie.stick_share_threshold) return "Fencer";
+  if (bodyShare >= PLAYER_ARCHETYPE_CONFIG.goalie.body_share_threshold) return "Positional";
+  return "Hybrid";
+}
+
+function weightedOverallFromCategories(archetype, categoryPct) {
+  const weights =
+    PLAYER_ARCHETYPE_CONFIG.skater.rating_weights[archetype] ||
+    PLAYER_ARCHETYPE_CONFIG.skater.rating_weights.Skater;
+
+  let weighted = 0;
+  let sum = 0;
+
+  for (const [key, wRaw] of Object.entries(weights || {})) {
+    const v = safeNum(categoryPct?.[key]);
+    const w = Math.max(0, safeNum(wRaw) ?? 0);
+    if (v == null || w <= 0) continue;
+    weighted += v * w;
+    sum += w;
+  }
+
+  return sum > 0 ? (weighted / sum) : null;
+}
+
+function ratingLabelFromScore(score) {
+  const t = PLAYER_ARCHETYPE_CONFIG.rating_thresholds;
+  const s = safeNum(score);
+  if (s == null) return "Average";
+  if (s >= t.superstar) return "Superstar";
+  if (s >= t.elite) return "Elite";
+  if (s >= t.impact) return "Impact";
+  if (s >= t.average) return "Average";
+  if (s >= t.plug) return "Plug";
+  if (s >= t.pylon) return "Pylon";
+  return "Benchwarmer";
+}
+
+function ratingColor(label) {
+  return PLAYER_ARCHETYPE_CONFIG.rating_colors[label] || "#e7e7e7";
+}
+
+function computePlayerArchetypeAndRating({ role, playerVals, leagueVals, pSeason, skaterPosGroup }) {
+  if (role === "GOALIE") {
+    const categoryPct = computeCategoryPctMap("GOALIE", playerVals, leagueVals);
+    const score = safeNum(categoryPct?.goaltending);
+    const archetype = goalieArchetypeFromSeasonRow(pSeason);
+    const rating = ratingLabelFromScore(score);
+    return { archetype, rating, score, categoryPct };
+  }
+
+  const categoryPct = computeCategoryPctMap("SKATER", playerVals, leagueVals);
+  const archetype = skaterArchetypeFromCategories(categoryPct, skaterPosGroup);
+  const score = weightedOverallFromCategories(archetype, categoryPct);
+  const rating = ratingLabelFromScore(score);
+  return { archetype, rating, score, categoryPct };
+}
+
+function ensureBarsHeadline() {
+  if (!elBarsChart || !elBarsChart.parentElement) return null;
+
+  let row = document.getElementById("playerBarsHeaderRow");
+  if (!row) {
+    row = document.createElement("div");
+    row.id = "playerBarsHeaderRow";
+    row.style.display = "flex";
+    row.style.justifyContent = "space-between";
+    row.style.alignItems = "center";
+    row.style.gap = "12px";
+    row.style.flexWrap = "wrap";
+    row.style.margin = "0 0 8px 0";
+    elBarsChart.parentElement.insertBefore(row, elBarsChart);
+  }
+
+  let el = document.getElementById("playerBarsHeadline");
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "playerBarsHeadline";
+    el.style.fontSize = "20px";
+    el.style.fontWeight = "700";
+    el.style.lineHeight = "1.2";
+    el.style.color = "#e7e7e7";
+    el.style.flex = "1 1 auto";
+    row.appendChild(el);
+  }
+
+  return el;
+}
+
+function renderBarsHeadline(archetype, rating) {
+  const el = ensureBarsHeadline();
+  if (!el) return;
+
+  el.innerHTML =
+    `${escapeHtml(archetype || "Skater")} &#8211; ` +
+    `<span style="color:${escapeHtml(ratingColor(rating))};">${escapeHtml(rating || "Average")}</span>`;
+}
+
+
+function pctVsLeague(key, playerVal, lgVal) {
+  if (!Number.isFinite(playerVal) || !Number.isFinite(lgVal)) return null;
+
+  // Signed differential stats should NOT use % vs league.
+  // Example: GFAx/15 of -0.37 vs league -0.04 should be negative, not +825%.
+  if (SIGNED_KEYS_PLAYERBARS.has(key)) {
+    let diff = (playerVal - lgVal) * PLAYER_BARS_SIGNED_SCALE;
+
+    if (diff > PLAYER_BARS_DELTA_CAP) diff = PLAYER_BARS_DELTA_CAP;
+    if (diff < -PLAYER_BARS_DELTA_CAP) diff = -PLAYER_BARS_DELTA_CAP;
+
+    return diff;
+  }
+
+  if (lgVal === 0) return null;
+
+  const inv = INVERT_KEYS_PLAYERBARS.has(key);
+  let pct = inv
+    ? ((lgVal - playerVal) / lgVal) * 100
+    : ((playerVal - lgVal) / lgVal) * 100;
+
+  if (pct > PLAYER_BARS_DELTA_CAP) pct = PLAYER_BARS_DELTA_CAP;
+  if (pct < -PLAYER_BARS_DELTA_CAP) pct = -PLAYER_BARS_DELTA_CAP;
+
+  return pct;
+}
+
+function weightedPctDiffVsLeague(stats, playerVals, leagueVals) {
+  let weighted = 0;
+  let weightSum = 0;
+
+  for (const stat of (stats || [])) {
+    const key = stat?.key;
+    if (!key) continue;
+
+    const p = safeNum(playerVals?.[key]);
+    const lg = safeNum(leagueVals?.[key]);
+
+    let pct = pctVsLeague(key, p, lg);
+    if (pct == null) continue;
+
+    const w = Math.max(0, safeNum(stat?.weight) ?? 0);
+    if (w <= 0) continue;
+
+    weighted += pct * w;
+    weightSum += w;
+  }
+
+  return weightSum > 0 ? (weighted / weightSum) : null;
 }
 
 function per15FromTotals(total, toiSeconds) {
@@ -970,27 +1506,86 @@ function per15FromTotals(total, toiSeconds) {
 function resolveTeamColorForBars() {
   const rootStyles = getComputedStyle(document.documentElement);
   const bg = rootStyles.getPropertyValue("--team-bg").trim() || "rgba(255,255,255,0.85)";
-  // If it's a hex, just use it; otherwise it's already rgb/rgba.
   return bg;
+}
+
+function weightVisualScale(weight, stats) {
+  const strength = Math.max(0, Math.min(1, safeNum(PLAYER_BARS_WEIGHT_VISUAL_STRENGTH) ?? 0));
+  if (strength <= 0) return 1;
+
+  const weights = (stats || [])
+    .map(s => Math.max(0, safeNum(s?.weight) ?? 0))
+    .filter(w => w > 0);
+
+  if (!weights.length) return 1;
+
+  const minW = Math.min(...weights);
+  const maxW = Math.max(...weights);
+  const w = Math.max(0, safeNum(weight) ?? 0);
+
+  if (maxW <= minW) return 1;
+
+  const norm = (w - minW) / (maxW - minW); // 0..1 within category
+  return (1 - strength) + (norm * strength);
+}
+
+function buildPlayerBarsCategories({ role, hasPossession }) {
+  const cats = role === "GOALIE"
+    ? PLAYER_BARS_CONFIG.goalie
+    : PLAYER_BARS_CONFIG.skater;
+
+  return cats
+    .map(cat => {
+      const stats = (cat.stats || []).filter(stat => {
+        if (stat.key === "possession_15" && !hasPossession) return false;
+        return true;
+      });
+      return { ...cat, stats };
+    })
+    .filter(cat => (cat.stats || []).length > 0);
+}
+
+function buildPlayerBarsMetrics({ role, hasPossession }) {
+  const categories = buildPlayerBarsCategories({ role, hasPossession });
+  const out = [];
+
+  for (const cat of categories) {
+    out.push({
+      key: `__hdr_${cat.key}`,
+      label: cat.label,
+      categoryKey: cat.key,
+      long: "",
+      show: "hdr"
+    });
+
+    for (const stat of cat.stats) {
+      out.push({
+        ...stat,
+        categoryKey: cat.key,
+        show: "stat",
+      });
+    }
+  }
+
+  return out;
 }
 
 /**
  * Build league averages from boxscores rows (stage-filtered by the file you already loaded).
- * Returns:
- *  - skater: { toi, g_15, a_15, xg_15, shots_15, passes_15, entries_15, exits_15, takeaways_15, turnovers_15, hits_15, blocks_15, possession_15? }
- *  - goalie: { sa, ga, xga, toi, svp, gsax_15, passes_15 }
  */
 function computeLeagueAveragesFromBoxscores(rows) {
-  // detect columns that may not exist in older seasons/exports
   const possKey = pickFirstExisting(rows?.[0] ?? {}, ["possession", "poss", "possessions", "pos_time", "possession_s", "poss_s"]);
 
-  // totals
   let s_toi = 0;
-const s = {
-  g: 0, a: 0, shots: 0, passes: 0, entries: 0, exits: 0,
-  takeaways: 0, turnovers: 0, blocks: 0, xg: 0,
-  possession: 0
-};
+  const s = {
+    g: 0, a: 0, shots: 0, xg: 0,
+    passes: 0, offensive_passes: 0, defensive_passes: 0,
+    entries: 0, exits: 0,
+    takeaways: 0, offensive_takeaways: 0, defensive_takeaways: 0,
+    turnovers: 0, offensive_turnovers: 0, defensive_turnovers: 0,
+    blocks: 0, hits: 0,
+    possession: 0,
+  };
 
   let g_toi = 0;
   const g = { sa: 0, ga: 0, xga: 0, passes: 0 };
@@ -1010,127 +1605,113 @@ const s = {
       g.ga += safeNum(r.ga) ?? 0;
       g.xga += safeNum(r.xGA ?? r.xga) ?? 0;
       g.passes += safeNum(r.passes) ?? 0;
-    } else {
-      const toi = safeNum(r.toi_s ?? r.toi) ?? 0;
-      if (toi > 0) s_toi += toi;
-
-      s.g += safeNum(r.g) ?? 0;
-      s.a += safeNum(r.a) ?? 0;
-      s.shots += safeNum(r.shots) ?? 0;
-      s.passes += safeNum(r.passes) ?? 0;
-      s.entries += safeNum(r.entries) ?? 0;
-      s.exits += safeNum(r.exits) ?? 0;
-      s.takeaways += safeNum(r.takeaways) ?? 0;
-      s.turnovers += safeNum(r.turnovers) ?? 0;
-      s.blocks += safeNum(r.blocks) ?? 0;
-      s.xg += safeNum(r.xG ?? r.xg) ?? 0;
-
-      if (possKey) s.possession += safeNum(r[possKey]) ?? 0;
+      continue;
     }
+
+    const toi = safeNum(r.toi_s ?? r.toi) ?? 0;
+    if (toi > 0) s_toi += toi;
+
+    s.g += safeNum(r.g) ?? 0;
+    s.a += safeNum(r.a) ?? 0;
+    s.shots += safeNum(r.shots) ?? 0;
+    s.xg += safeNum(r.xG ?? r.xg) ?? 0;
+
+    s.passes += safeNum(r.passes) ?? 0;
+    s.offensive_passes += safeNum(r.offensive_passes) ?? 0;
+    s.defensive_passes += safeNum(r.defensive_passes) ?? 0;
+
+    s.entries += safeNum(r.entries) ?? 0;
+    s.exits += safeNum(r.exits) ?? 0;
+
+    s.takeaways += safeNum(r.takeaways) ?? 0;
+    s.offensive_takeaways += safeNum(r.offensive_takeaways) ?? 0;
+    s.defensive_takeaways += safeNum(r.defensive_takeaways) ?? 0;
+
+    s.turnovers += safeNum(r.turnovers) ?? 0;
+    s.offensive_turnovers += safeNum(r.offensive_turnovers) ?? 0;
+    s.defensive_turnovers += safeNum(r.defensive_turnovers) ?? 0;
+
+    s.blocks += safeNum(r.blocks) ?? 0;
+    s.hits += safeNum(r.hits) ?? 0;
+
+    if (possKey) s.possession += safeNum(r[possKey]) ?? 0;
   }
 
-  // goalie sv% is not per15
-  const sv = (g.sa > 0) ? (g.sa - g.ga) : null;
-  const svp = (g.sa > 0 && sv != null) ? (sv / g.sa) * 100 : null;
+  const lgG15 = per15FromTotals(s.g, s_toi);
+  const lgXG15 = per15FromTotals(s.xg, s_toi);
+  const gfaxTot = (Number.isFinite(s.g) && Number.isFinite(s.xg)) ? (s.g - s.xg) : null;
 
-  // goalie GSAx per15 (xGA - GA)
-  const gsaxTot = (Number.isFinite(g.xga) && Number.isFinite(g.ga)) ? (g.xga - g.ga) : null;
+  const skater = {
+    toi: s_toi,
+    g_15: lgG15,
+    a_15: per15FromTotals(s.a, s_toi),
+    xg_15: lgXG15,
+    shots_15: per15FromTotals(s.shots, s_toi),
+    gfax_15: per15FromTotals(gfaxTot, s_toi),
 
-const lgG15 = per15FromTotals(s.g, s_toi);
-const lgShots15 = per15FromTotals(s.shots, s_toi);
-const lgShp = (lgG15 != null && lgShots15 != null && lgShots15 > 0) ? (lgG15 / lgShots15) * 100 : null;
+    passes_15: per15FromTotals(s.passes, s_toi),
+    offensive_passes_15: per15FromTotals(s.offensive_passes, s_toi),
+    defensive_passes_15: per15FromTotals(s.defensive_passes, s_toi),
 
-const skater = {
-  toi: s_toi,
-  g_15: lgG15,
-  a_15: per15FromTotals(s.a, s_toi),
-  xg_15: per15FromTotals(s.xg, s_toi),
-  shots_15: lgShots15,
-
-  shp: lgShp, // <-- ADD THIS
-
-  passes_15: per15FromTotals(s.passes, s_toi),
     entries_15: per15FromTotals(s.entries, s_toi),
-    possession_15: possKey
-  ? (() => {
-      const per15Seconds = per15FromTotals(s.possession, s_toi);
-      return per15Seconds != null ? per15Seconds / 60 : null; // convert to minutes
-    })()
-  : null,
+    exits_15: per15FromTotals(s.exits, s_toi),
 
     takeaways_15: per15FromTotals(s.takeaways, s_toi),
+    offensive_takeaways_15: per15FromTotals(s.offensive_takeaways, s_toi),
+    defensive_takeaways_15: per15FromTotals(s.defensive_takeaways, s_toi),
+
     turnovers_15: per15FromTotals(s.turnovers, s_toi),
+    offensive_turnovers_15: per15FromTotals(s.offensive_turnovers, s_toi),
+    defensive_turnovers_15: per15FromTotals(s.defensive_turnovers, s_toi),
+
     blocks_15: per15FromTotals(s.blocks, s_toi),
-    exits_15: per15FromTotals(s.exits, s_toi),
+    hits_15: per15FromTotals(s.hits, s_toi),
+
+    possession_15: possKey
+      ? (() => {
+          const per15Seconds = per15FromTotals(s.possession, s_toi);
+          return per15Seconds != null ? per15Seconds / 60 : null;
+        })()
+      : null,
   };
 
-const svTotLeague = (g.sa > 0) ? (g.sa - g.ga) : null;
+  const svTotLeague = (g.sa > 0) ? (g.sa - g.ga) : null;
+  const svp = (g.sa > 0 && svTotLeague != null) ? (svTotLeague / g.sa) * 100 : null;
+  const gsaxTot = (Number.isFinite(g.xga) && Number.isFinite(g.ga)) ? (g.xga - g.ga) : null;
 
-const goalie = {
-  toi: g_toi,
-
-  sv_15:  per15FromTotals(svTotLeague, g_toi),
-  ga_15:  per15FromTotals(g.ga, g_toi),
-
-  svp,
-  gsax_15: per15FromTotals(gsaxTot, g_toi),
-  passes_15: per15FromTotals(g.passes, g_toi),
-};
+  const goalie = {
+    toi: g_toi,
+    sv_15: per15FromTotals(svTotLeague, g_toi),
+    ga_15: per15FromTotals(g.ga, g_toi),
+    svp,
+    gsax_15: per15FromTotals(gsaxTot, g_toi),
+    passes_15: per15FromTotals(g.passes, g_toi),
+  };
 
   return { skater, goalie, possKey };
 }
 
-function buildPlayerBarsMetrics({ role, hasPossession }) {
-if (role === "GOALIE") {
-  return [
-    { key: "__hdr_goalie", label: "Goaltending", long: "", show: "hdr" },
-
-    { key: "sv_15",  label: "SV/15",  long: "Saves per 15", kind: "num" },
-    { key: "ga_15",  label: "GA/15",  long: "Goals Against per 15", kind: "num" },
-
-    { key: "svp",      label: "SV%",   long: "Save Percentage", kind: "pct" },
-    { key: "gsax_15",  label: "GSAx/15", long: "Goals Saved Above Expected per 15", kind: "num" },
-    { key: "passes_15",label: "PASS/15", long: "Passes per 15", kind: "num" },
-  ];
-}
-
-  // Skater
-  const off = [
-    { key: "__hdr_off", label: "Offense", long: "", show: "hdr" },
-    { key: "g_15",      label: "G/15",    long: "Goals per 15", kind: "num" },
-    { key: "a_15",      label: "A/15",    long: "Assists per 15", kind: "num" },
-    { key: "xg_15",     label: "xG/15",   long: "Expected Goals per 15", kind: "num" },
-    { key: "shots_15",  label: "S/15",    long: "Shots per 15", kind: "num" },
-	{ key: "shp",       label: "SH%",     long: "Shooting Percentage", kind: "pct" },
-    { key: "passes_15", label: "PASS/15", long: "Passes per 15", kind: "num" },
-    { key: "entries_15",label: "ENT/15",  long: "Entries per 15", kind: "num" },
-  ];
-
-  if (hasPossession) {
-    off.push({ key: "possession_15", label: "POSS/15", long: "Possession per 15 (min)", kind: "num" });
-  }
-
-  const def = [
-    { key: "__hdr_def", label: "Defense", long: "", show: "hdr" },
-    // Takeaways inverted per your spec
-    { key: "takeaways_15", label: "TA/15", long: "Takeaways per 15", kind: "num" },
-    { key: "turnovers_15", label: "TO/15",  long: "Turnovers per 15", kind: "num" },
-    { key: "blocks_15",    label: "BLK/15", long: "Blocks per 15", kind: "num" },
-    { key: "exits_15",     label: "EXT/15", long: "Exits per 15", kind: "num" },
-  ];
-
-  return [...off, ...def];
-}
-
-	function computeLeagueMinsFromPlayers(playersRows, role, advOn) {
+function computeLeagueMinsFromPlayers(playersRows, role, advOn) {
   const mins = {};
 
   for (const p of (playersRows || [])) {
     if (!advOn) continue;
 
+    const gpS = Number(p.gp_s ?? 0);
     const gpG = Number(p.gp_g ?? 0);
+
+    if (role === "SKATER" && gpS > 0) {
+      const vals = readPlayerPer15FromSeasonRow(p, advOn)?.skater;
+      if (!vals) continue;
+
+      for (const [k, v] of Object.entries(vals)) {
+        if (!Number.isFinite(v)) continue;
+        mins[k] = (mins[k] == null) ? v : Math.min(mins[k], v);
+      }
+    }
+
     if (role === "GOALIE" && gpG > 0) {
-      const vals = readPlayerPer15FromSeasonRow(p, advOn, null)?.goalie;
+      const vals = readPlayerPer15FromSeasonRow(p, advOn)?.goalie;
       if (!vals) continue;
 
       for (const [k, v] of Object.entries(vals)) {
@@ -1177,78 +1758,84 @@ function computeLeagueMaxesFromPlayers(playersRows, role, advOn) {
 }
 
 function readPlayerPer15FromSeasonRow(pSeason, advOn, roleSplitSeason) {
-  // If adv is off, perGpNormalized falls back to per GP (we do NOT want that),
-  // so we’ll just return nulls and hide the chart.
   if (!advOn) return null;
 
-  // Skater
-const skG = roleSplitSeason ? roleSplitSeason.skater.g : toNumMaybe(pSeason.g);
-const skA = roleSplitSeason ? roleSplitSeason.skater.a : toNumMaybe(pSeason.a);
-const skPass = roleSplitSeason ? roleSplitSeason.skater.passes : toNumMaybe(pSeason.passes);
+  const skG = roleSplitSeason ? roleSplitSeason.skater.g : toNumMaybe(pSeason.g);
+  const skA = roleSplitSeason ? roleSplitSeason.skater.a : toNumMaybe(pSeason.a);
 
-// compute once so SH% uses the same per/15 values as the bars
-const gPer15 = perGpNormalized(skG, pSeason, "SKATER", true);
-const shotsPer15 = perGpNormalized(toNumMaybe(pSeason.shots), pSeason, "SKATER", true);
+  const skPass = roleSplitSeason ? roleSplitSeason.skater.passes : toNumMaybe(pSeason.passes);
+  const skOPass = toNumMaybe(pSeason.offensive_passes);
+  const skDPass = toNumMaybe(pSeason.defensive_passes);
 
-const s = {
-  g_15: gPer15,
-  a_15: perGpNormalized(skA, pSeason, "SKATER", true),
-  xg_15: perGpNormalized(toNumMaybe(pSeason.xG), pSeason, "SKATER", true),
+  const skTake = toNumMaybe(pSeason.takeaways);
+  const skOTake = toNumMaybe(pSeason.offensive_takeaways);
+  const skDTake = toNumMaybe(pSeason.defensive_takeaways);
 
-  shots_15: shotsPer15,
+  const skTurn = toNumMaybe(pSeason.turnovers);
+  const skOTurn = toNumMaybe(pSeason.offensive_turnovers);
+  const skDTurn = toNumMaybe(pSeason.defensive_turnovers);
 
-  // SH% = goals/shots * 100 (using per/15 values to match the chart mode)
-  shp: (gPer15 != null && shotsPer15 != null && shotsPer15 > 0) ? (gPer15 / shotsPer15) * 100 : null,
+  const skXG = toNumMaybe(pSeason.xG);
+  const skShots = toNumMaybe(pSeason.shots);
 
-  passes_15: perGpNormalized(skPass, pSeason, "SKATER", true),
-  entries_15: perGpNormalized(toNumMaybe(pSeason.entries), pSeason, "SKATER", true),
-  exits_15: perGpNormalized(toNumMaybe(pSeason.exits), pSeason, "SKATER", true),
+  const gPer15 = perGpNormalized(skG, pSeason, "SKATER", true);
+  const xgPer15 = perGpNormalized(skXG, pSeason, "SKATER", true);
 
-  takeaways_15: perGpNormalized(toNumMaybe(pSeason.takeaways), pSeason, "SKATER", true),
-  turnovers_15: perGpNormalized(toNumMaybe(pSeason.turnovers), pSeason, "SKATER", true),
-  blocks_15: perGpNormalized(toNumMaybe(pSeason.blocks), pSeason, "SKATER", true),
-};
+  const s = {
+    g_15: gPer15,
+    a_15: perGpNormalized(skA, pSeason, "SKATER", true),
+    xg_15: xgPer15,
+    shots_15: perGpNormalized(skShots, pSeason, "SKATER", true),
+    gfax_15: (gPer15 != null && xgPer15 != null) ? (gPer15 - xgPer15) : null,
 
+    passes_15: perGpNormalized(skPass, pSeason, "SKATER", true),
+    offensive_passes_15: perGpNormalized(skOPass, pSeason, "SKATER", true),
+    defensive_passes_15: perGpNormalized(skDPass, pSeason, "SKATER", true),
 
-  // Possession might not exist
+    entries_15: perGpNormalized(toNumMaybe(pSeason.entries), pSeason, "SKATER", true),
+    exits_15: perGpNormalized(toNumMaybe(pSeason.exits), pSeason, "SKATER", true),
+
+    takeaways_15: perGpNormalized(skTake, pSeason, "SKATER", true),
+    offensive_takeaways_15: perGpNormalized(skOTake, pSeason, "SKATER", true),
+    defensive_takeaways_15: perGpNormalized(skDTake, pSeason, "SKATER", true),
+
+    turnovers_15: perGpNormalized(skTurn, pSeason, "SKATER", true),
+    offensive_turnovers_15: perGpNormalized(skOTurn, pSeason, "SKATER", true),
+    defensive_turnovers_15: perGpNormalized(skDTurn, pSeason, "SKATER", true),
+
+    blocks_15: perGpNormalized(toNumMaybe(pSeason.blocks), pSeason, "SKATER", true),
+    hits_15: perGpNormalized(toNumMaybe(pSeason.hits), pSeason, "SKATER", true),
+  };
+
   const possKey = pickFirstExisting(pSeason ?? {}, ["possession", "poss", "possessions", "pos_time", "possession_s", "poss_s"]);
   if (possKey) {
-    const possPer15Seconds = perGpNormalized(
-  toNumMaybe(pSeason[possKey]),
-  pSeason,
-  "SKATER",
-  true
-);
-
-s.possession_15 = possPer15Seconds != null
-  ? possPer15Seconds / 60   // convert seconds → minutes
-  : null;
+    const possPer15Seconds = perGpNormalized(toNumMaybe(pSeason[possKey]), pSeason, "SKATER", true);
+    s.possession_15 = possPer15Seconds != null ? possPer15Seconds / 60 : null;
   }
 
-  // Goalie
   const ga = toNumMaybe(pSeason.ga);
   const xga = toNumMaybe(pSeason.xGA);
   const gsaxTot = (xga != null && ga != null) ? (xga - ga) : null;
-
-  // SV% (not per15)
   const sa = toNumMaybe(pSeason.sa);
   const svpCsv = toNumMaybe(pSeason.sv_pct);
-  const svp = (svpCsv != null && Number.isFinite(svpCsv)) ? (svpCsv * 100)
+  const svp = (svpCsv != null && Number.isFinite(svpCsv))
+    ? (svpCsv * 100)
     : (sa != null && sa > 0 && ga != null ? ((sa - ga) / sa) * 100 : null);
-const gPass = roleSplitSeason ? roleSplitSeason.goalie.passes : toNumMaybe(pSeason.passes);
-const svTot = (sa != null && ga != null) ? (sa - ga) : null;
 
-const g = {
-  sv_15:  perGpNormalized(svTot, pSeason, "GOALIE", true),
-  ga_15:  perGpNormalized(ga,    pSeason, "GOALIE", true),
+  const gPass = roleSplitSeason ? roleSplitSeason.goalie.passes : toNumMaybe(pSeason.passes);
+  const svTot = (sa != null && ga != null) ? (sa - ga) : null;
 
-  svp,
-  gsax_15: perGpNormalized(gsaxTot, pSeason, "GOALIE", true),
-  passes_15: perGpNormalized(gPass, pSeason, "GOALIE", true),
-};
+  const g = {
+    sv_15: perGpNormalized(svTot, pSeason, "GOALIE", true),
+    ga_15: perGpNormalized(ga, pSeason, "GOALIE", true),
+    svp,
+    gsax_15: perGpNormalized(gsaxTot, pSeason, "GOALIE", true),
+    passes_15: perGpNormalized(gPass, pSeason, "GOALIE", true),
+  };
 
   return { skater: s, goalie: g, possKey };
 }
+
 
 function lerp(a, b, t) { return a + (b - a) * t; }
 
@@ -1558,9 +2145,9 @@ function ensureBarsCompareControls() {
     input.setAttribute("list", "playerBarsCompareList");
     input.setAttribute("autocomplete", "off");
     input.placeholder = "League Average";
-    input.style.minWidth = "220px";
-    input.style.maxWidth = "280px";
-    input.style.padding = "6px 10px";
+    input.style.minWidth = "100px";
+    input.style.maxWidth = "130px";
+    input.style.padding = "5px 8px";
     input.style.borderRadius = "10px";
     input.style.border = "1px solid rgba(255,255,255,0.16)";
     input.style.background = "rgba(255,255,255,0.06)";
@@ -1573,7 +2160,18 @@ function ensureBarsCompareControls() {
     wrap.appendChild(input);
     wrap.appendChild(list);
 
-    elBarsChart.parentElement.insertBefore(wrap, elBarsChart);
+        const row = document.getElementById("playerBarsHeaderRow") || (() => {
+      ensureBarsHeadline();
+      return document.getElementById("playerBarsHeaderRow");
+    })();
+
+    if (row) {
+      wrap.style.margin = "0 0 0 auto";
+      wrap.style.flex = "0 0 auto";
+      row.appendChild(wrap);
+    } else {
+      elBarsChart.parentElement.insertBefore(wrap, elBarsChart);
+    }
 
     const applySelection = () => {
       const value = String(input.value ?? "").trim();
@@ -1679,6 +2277,19 @@ function rerenderPlayerBarsFromState() {
   const { compareVals, compareLabel } = getBarsCompareTarget(runtime, role);
   const teamColor = resolveTeamColorForBars();
 
+  const headlineBaseline = role === "GOALIE"
+  ? runtime.league.goalie
+  : runtime.league.skater;
+
+const headline = computePlayerArchetypeAndRating({
+  role,
+  playerVals: role === "GOALIE" ? runtime.player.goalie : runtime.player.skater,
+  leagueVals: headlineBaseline,
+  pSeason: runtime.pSeason,
+  skaterPosGroup: runtime.primarySkaterPosGroup
+});
+renderBarsHeadline(headline.archetype, headline.rating);
+
   if (role === "GOALIE") {
     renderPlayerBarsChart({
       role: "GOALIE",
@@ -1696,6 +2307,7 @@ function rerenderPlayerBarsFromState() {
       leagueVals: compareVals,
       compareLabel,
       maxes: runtime.maxesSkater,
+      mins: runtime.minsSkater,
       teamColor
     });
   }
@@ -1704,211 +2316,168 @@ function rerenderPlayerBarsFromState() {
 function renderPlayerBarsChart({ role, playerVals, leagueVals, maxes, mins, teamColor, compareLabel = "League Avg" }) {
   if (!elBarsChart || !window.Plotly) return;
 
-  const metrics = buildPlayerBarsMetrics({
-    role,
-    hasPossession: role === "SKATER" && (playerVals?.possession_15 != null || leagueVals?.possession_15 != null),
-  });
-  
-const offenseAvgPct =
-  (role === "SKATER")
-    ? avgPctDiffVsLeague(OFFENSE_KEYS_PLAYERBARS, playerVals, leagueVals)
-    : null;
-	
-	const defenseAvgPct =
-  (role === "SKATER")
-    ? avgPctDiffVsLeague(DEFENSE_KEYS_PLAYERBARS, playerVals, leagueVals)
-    : null;
+  const hasPossession = role === "SKATER" && (playerVals?.possession_15 != null || leagueVals?.possession_15 != null);
+  const metrics = buildPlayerBarsMetrics({ role, hasPossession });
+  const categories = buildPlayerBarsCategories({ role, hasPossession });
 
-const goalieAvgPct =
-  (role === "GOALIE")
-    ? avgPctDiffVsLeague(GOALIE_KEYS_PLAYERBARS, playerVals, leagueVals)
-    : null;
+  const categoryPct = new Map();
+  for (const cat of categories) {
+    categoryPct.set(cat.key, weightedPctDiffVsLeague(cat.stats, playerVals, leagueVals));
+  }
 
   const y = [];
   const xLeague = [];
   const xPlayer = [];
-  const hoverText = [];
   const custom = [];
   const playerColors = [];
   const tickText = [];
   const headerAnnots = [];
 
   for (const m of metrics) {
-    // section header rows: no bars
-if (m.show === "hdr") {
-  // keep a real category row so spacing stays consistent
-  y.push(m.label);
+    if (m.show === "hdr") {
+      y.push(m.label);
+      tickText.push("");
 
-  // hide the tick label for this row (we'll draw an annotation instead)
-  tickText.push("");
+      const headerPct = categoryPct.get(m.categoryKey) ?? null;
+      let headerText = m.label.toUpperCase();
+      if (headerPct != null) {
+        headerText = `${m.label.toUpperCase()} : ${fmtSignedPct(headerPct, 1)}`;
+      }
 
-  // centered header text over the plot area
-let headerText = m.label;
-let headerPct = null;
+      headerAnnots.push({
+        xref: "paper",
+        x: 0.46,
+        xanchor: "center",
+        yref: "y",
+        y: m.label,
+        yanchor: "middle",
+        text: `<b>${escapeHtml(headerText)}</b>`,
+        showarrow: false,
+        align: "center",
+        font: { size: 18, color: pctColor(headerPct) }
+      });
 
-if (m.key === "__hdr_off") {
-  headerPct = offenseAvgPct;
-  if (headerPct != null) {
-    headerText = `OFFENSE : ${fmtSignedPct(headerPct, 1)}`;
-  }
-}
+      xLeague.push(null);
+      xPlayer.push(null);
+      playerColors.push("rgba(0,0,0,0)");
+      custom.push(["", "", "", ""]);
+      continue;
+    }
 
-if (m.key === "__hdr_def") {
-  headerPct = defenseAvgPct;
-  if (headerPct != null) {
-    headerText = `DEFENSE : ${fmtSignedPct(headerPct, 1)}`;
-  }
-}
-
-if (m.key === "__hdr_goalie") {
-  headerPct = goalieAvgPct;
-  if (headerPct != null) {
-    headerText = `GOALTENDING : ${fmtSignedPct(headerPct, 1)}`;
-  }
-}
-
-headerAnnots.push({
-  xref: "paper",
-  x: 0.46,
-  xanchor: "center",
-  yref: "y",
-  y: m.label,
-  yanchor: "middle",
-  text: `<b>${escapeHtml(headerText)}</b>`,
-  showarrow: false,
-  align: "center",
-  font: { size: 18, color: pctColor(headerPct) }
-});
-
-  xLeague.push(null);
-  xPlayer.push(null);
-  hoverText.push("");
-  playerColors.push("rgba(0,0,0,0)");
-  custom.push(["", "", "", ""]);
-  continue;
-}
-
-
-    const p = (m.key === "svp") ? safeNum(playerVals?.svp) : safeNum(playerVals?.[m.key]);
-    const lg = (m.key === "svp") ? safeNum(leagueVals?.svp) : safeNum(leagueVals?.[m.key]);
+    const p = safeNum(playerVals?.[m.key]);
+    const lg = safeNum(leagueVals?.[m.key]);
 
     y.push(m.label);
-	tickText.push(m.label);
+    tickText.push(m.label);
+
     let maxVal = (maxes && Number.isFinite(maxes[m.key])) ? maxes[m.key] : 1;
+    let minVal = (mins && Number.isFinite(mins[m.key])) ? mins[m.key] : 0;
 
-// optional: make SV% ceiling always consistent
-if (m.key === "svp") maxVal = 100;
-if (m.key === "shp") maxVal = 50;
+    if (m.key === "svp") {
+      maxVal = 100;
+      minVal = 0;
+    }
 
-// keep it sane
-maxVal = Math.max(1, maxVal);
-const maxAbsDiff = Math.max(
-  Math.abs((maxes?.[m.key] ?? 0) - (lg ?? 0)),
-  Math.abs(0 - (lg ?? 0))
-);
+    if (m.key === "shp") {
+      maxVal = Math.max(50, maxVal);
+      minVal = Math.min(0, minVal);
+    }
 
+    if (Number.isFinite(p)) {
+      maxVal = Math.max(maxVal, p);
+      minVal = Math.min(minVal, p);
+    }
+    if (Number.isFinite(lg)) {
+      maxVal = Math.max(maxVal, lg);
+      minVal = Math.min(minVal, lg);
+    }
 
-const invLen = INVERT_KEYS_PLAYERBARS.has(m.key);
+    const maxAbsDiff = Math.max(
+      Math.abs((maxes?.[m.key] ?? maxVal) - (lg ?? 0)),
+      Math.abs((mins?.[m.key] ?? minVal) - (lg ?? 0)),
+      Math.abs(p ?? 0 - (lg ?? 0))
+    );
 
-let lgNormRaw = null;
-let pNormRaw = null;
+    const invLen = INVERT_KEYS_PLAYERBARS.has(m.key);
+    const signedMetric = SIGNED_KEYS_PLAYERBARS.has(m.key);
 
-// Special-case: GSAx can be negative.
-// Use min = (league min among goalies) - 1 so worst goalie still has a visible bar.
-if (role === "GOALIE" && m.key === "gsax_15") {
-  const maxG = (maxes && Number.isFinite(maxes[m.key])) ? maxes[m.key] : 1;
-  const minG = (mins && Number.isFinite(mins[m.key])) ? (mins[m.key] - 0.5) : -0.5;
+    let lgNormRaw = null;
+    let pNormRaw = null;
 
-  const range = (maxG - minG) || 1;
+    if (signedMetric) {
+      const signedMin = (mins && Number.isFinite(mins[m.key])) ? Math.min(mins[m.key], minVal) : Math.min(minVal, -0.5);
+      const signedMax = (maxes && Number.isFinite(maxes[m.key])) ? Math.max(maxes[m.key], maxVal) : Math.max(maxVal, 0.5);
+      const range = (signedMax - signedMin) || 1;
 
-  lgNormRaw = Number.isFinite(lg) ? ((lg - minG) / range) : null;
-  pNormRaw  = Number.isFinite(p)  ? ((p  - minG) / range) : null;
-} else {
-  // Use dynamic min/max scaling instead of 0→max
+      lgNormRaw = Number.isFinite(lg) ? ((lg - signedMin) / range) : null;
+      pNormRaw = Number.isFinite(p) ? ((p - signedMin) / range) : null;
+    } else {
+      if (invLen) {
+        const pad = Math.max(0.5, (maxVal - minVal) * 0.05);
+        maxVal += pad;
+      }
 
-let maxV = (maxes && Number.isFinite(maxes[m.key])) ? maxes[m.key] : 1;
-let minV = (mins && Number.isFinite(mins[m.key])) ? mins[m.key] : 0;
+      const range = (maxVal - minVal) || 1;
+      lgNormRaw = Number.isFinite(lg) ? ((lg - minVal) / range) : null;
+      pNormRaw = Number.isFinite(p) ? ((p - minVal) / range) : null;
 
-if (Number.isFinite(p))  { maxV = Math.max(maxV, p);  minV = Math.min(minV, p); }
-if (Number.isFinite(lg)) { maxV = Math.max(maxV, lg); minV = Math.min(minV, lg); }
+      if (invLen) {
+        if (lgNormRaw != null) lgNormRaw = 1 - lgNormRaw;
+        if (pNormRaw != null) pNormRaw = 1 - pNormRaw;
+      }
+    }
 
-// If inverted, pad the max a bit so the worst value doesn't become exactly 0-width
-if (invLen) {
-  const pad = Math.max(0.5, (maxV - minV) * 0.05); // tweak 0.5 / 0.05 to taste
-  maxV += pad;
-}
+    const lgNorm = (lgNormRaw == null) ? null : Math.max(0, Math.min(1, lgNormRaw));
+    const pNorm  = (pNormRaw  == null) ? null : Math.max(0, Math.min(1, pNormRaw));
+    const visualScale = weightVisualScale(m.weight, categories.find(c => c.key === m.categoryKey)?.stats);
 
-const range = (maxV - minV) || 1;
-
-  if (Number.isFinite(lg)) {
-    lgNormRaw = (lg - minV) / range;
-  }
-
-  if (Number.isFinite(p)) {
-    pNormRaw = (p - minV) / range;
-  }
-
-  // If inverted stat, flip after normalization
-  if (invLen) {
-    if (lgNormRaw != null) lgNormRaw = 1 - lgNormRaw;
-    if (pNormRaw  != null) pNormRaw  = 1 - pNormRaw;
-  }
-}
-
-
-
-const lgNorm = (lgNormRaw == null) ? null : Math.max(0, Math.min(1, lgNormRaw));
-const pNorm  = (pNormRaw  == null) ? null : Math.max(0, Math.min(1, pNormRaw));
-
-xLeague.push(lgNorm);
-xPlayer.push(pNorm);
+    xLeague.push(lgNorm == null ? null : lgNorm * visualScale);
+    xPlayer.push(pNorm == null ? null : pNorm * visualScale);
 
     let diff = null;
+    if (Number.isFinite(p) && Number.isFinite(lg)) {
+      const inv = INVERT_KEYS_PLAYERBARS.has(m.key);
+      diff = inv ? (lg - p) : (p - lg);
+    }
 
-if (Number.isFinite(p) && Number.isFinite(lg)) {
-  const inv = INVERT_KEYS_PLAYERBARS.has(m.key);
-  diff = inv ? (lg - p) : (p - lg);
-}
-
-playerColors.push(diffToTriColor(diff, maxAbsDiff));
+    playerColors.push(diffToTriColor(diff, maxAbsDiff));
 
     const pFmt = (p == null) ? "—" : (m.kind === "pct" ? `${p.toFixed(1)}%` : p.toFixed(2));
     const lgFmt = (lg == null) ? "—" : (m.kind === "pct" ? `${lg.toFixed(1)}%` : lg.toFixed(2));
 
     let diffFmt = "—";
-
-if (diff != null) {
-  const rounded = Math.abs(diff) < 0.005 ? 0 : diff;
-  diffFmt = `${rounded >= 0 ? "+" : ""}${rounded.toFixed(m.kind === "pct" ? 1 : 2)}`;
-}
+    if (diff != null) {
+      const rounded = Math.abs(diff) < 0.005 ? 0 : diff;
+      diffFmt = `${rounded >= 0 ? "+" : ""}${rounded.toFixed(m.kind === "pct" ? 1 : 2)}`;
+    }
 
     custom.push([m.long, pFmt, lgFmt, diffFmt]);
   }
 
-y.reverse();
-xLeague.reverse();
-xPlayer.reverse();
-custom.reverse();
-playerColors.reverse();
-tickText.reverse();
+  y.reverse();
+  xLeague.reverse();
+  xPlayer.reverse();
+  custom.reverse();
+  playerColors.reverse();
+  tickText.reverse();
 
-const traceLeague = {
-  type: "bar",
-  orientation: "h",
-  y,
-  x: xLeague,
-  customdata: custom,
-hovertemplate:
-  `<b>%{customdata[0]}</b><br>` +
-  `%{customdata[1]} (${escapeHtml(compareLabel)}: %{customdata[2]})<br>` +
-  `<span style="font-weight:700;">%{customdata[3]}</span>` +
-  `<extra></extra>`,
-hoverlabel: {
-  bgcolor: playerColors,   // EXACT same as player bar colors
-  font: { color: "#111" }
-},
-  marker: { color: "rgba(255,255,255,0.20)" },
-};
+  const traceLeague = {
+    type: "bar",
+    orientation: "h",
+    y,
+    x: xLeague,
+    customdata: custom,
+    hovertemplate:
+      `<b>%{customdata[0]}</b><br>` +
+      `%{customdata[1]} (${escapeHtml(compareLabel)}: %{customdata[2]})<br>` +
+      `<span style="font-weight:700;">%{customdata[3]}</span>` +
+      `<extra></extra>`,
+    hoverlabel: {
+      bgcolor: playerColors,
+      font: { color: "#111" }
+    },
+    marker: { color: "rgba(255,255,255,0.20)" },
+  };
 
   const tracePlayer = {
     type: "bar",
@@ -1916,17 +2485,17 @@ hoverlabel: {
     y,
     x: xPlayer,
     customdata: custom,
-hovertemplate:
-  `<b>%{customdata[0]}</b><br>` +
-  `%{customdata[1]} (${escapeHtml(compareLabel)}: %{customdata[2]})<br>` +
-  `<span style="font-weight:700;">%{customdata[3]}</span>` +
-  `<extra></extra>`,
-hoverlabel: {
-  bgcolor: playerColors,   // EXACT same as player bar colors
-  font: { color: "#111" }
-},
+    hovertemplate:
+      `<b>%{customdata[0]}</b><br>` +
+      `%{customdata[1]} (${escapeHtml(compareLabel)}: %{customdata[2]})<br>` +
+      `<span style="font-weight:700;">%{customdata[3]}</span>` +
+      `<extra></extra>`,
+    hoverlabel: {
+      bgcolor: playerColors,
+      font: { color: "#111" }
+    },
     marker: { color: playerColors },
-	opacity: 0.5,
+    opacity: 0.5,
   };
 
   const layout = {
@@ -1934,29 +2503,28 @@ hoverlabel: {
     margin: { l: 60, r: 10, t: 10, b: 20 },
     paper_bgcolor: "rgba(0,0,0,0)",
     plot_bgcolor: "rgba(0,0,0,0)",
-xaxis: {
-  showgrid: true,
-  gridcolor: "rgba(255,255,255,0.08)",
-  zeroline: false,
-  showticklabels: false,
-  fixedrange: true,
-  range: [0, 1] // we'll override per-stat below
-},
-yaxis: {
-  showgrid: false,
-  tickfont: {
-    size: 12,
-    family: "Inter, Arial, sans-serif",  // ← change this
-    color: "#e7e7e7"                      // optional
-  },
-  fixedrange: true,
-
-  tickmode: "array",
-  tickvals: y,
-  ticktext: tickText
-},
+    xaxis: {
+      showgrid: true,
+      gridcolor: "rgba(255,255,255,0.08)",
+      zeroline: false,
+      showticklabels: false,
+      fixedrange: true,
+      range: [0, 1]
+    },
+    yaxis: {
+      showgrid: false,
+      tickfont: {
+        size: 12,
+        family: "Inter, Arial, sans-serif",
+        color: "#e7e7e7"
+      },
+      fixedrange: true,
+      tickmode: "array",
+      tickvals: y,
+      ticktext: tickText
+    },
     showlegend: false,
-	annotations: headerAnnots,
+    annotations: headerAnnots,
   };
 
   const config = {
@@ -1965,7 +2533,8 @@ yaxis: {
     scrollZoom: false,
     doubleClick: false
   };
-window.Plotly.react(elBarsChart, [traceLeague, tracePlayer], layout, config);
+
+  window.Plotly.react(elBarsChart, [traceLeague, tracePlayer], layout, config);
 }
 
 function setSegActive(container, role) {
@@ -2116,6 +2685,7 @@ const spGoalies = rows
 
 const leagueAvgSkater = spSkaters.length ? (spSkaters.reduce((a,b)=>a+b,0) / spSkaters.length) : 0;
 const leagueAvgGoalie = spGoalies.length ? (spGoalies.reduce((a,b)=>a+b,0) / spGoalies.length) : 0;
+const primarySkaterPosGroup = inferPrimarySkaterPositionGroupFromBoxscores(rows, pSeason);
 
 // Fallback (in case early season has 0 goalie or 0 skater samples)
 const spAll = [...spSkaters, ...spGoalies];
@@ -2200,6 +2770,7 @@ try {
     const player = readPlayerPer15FromSeasonRow(pSeason, advOn, roleSplitSeason);
 	const seasonPlayers = players; // already loaded earlier in page
 	const maxesSkater = computeLeagueMaxesFromPlayers(seasonPlayers, "SKATER", advOn);
+	const minsSkater = computeLeagueMinsFromPlayers(seasonPlayers, "SKATER", advOn);
 	const maxesGoalie = computeLeagueMaxesFromPlayers(seasonPlayers, "GOALIE", advOn);
 	const minsGoalie = computeLeagueMinsFromPlayers(seasonPlayers, "GOALIE", advOn);
 
@@ -2246,9 +2817,12 @@ try {
       boxRows: rows,
       league,
       player,
+      pSeason,
       maxesSkater,
+      minsSkater,
       maxesGoalie,
-      minsGoalie
+      minsGoalie,
+	  primarySkaterPosGroup
     };
     barsCompareState.role = role;
     barsCompareState.candidates = buildBarsCompareCandidates(seasonPlayers, teams, pSeason, role);
