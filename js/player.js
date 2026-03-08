@@ -1226,19 +1226,6 @@ function skaterArchetypeFromCategories(categoryPct, posGroup) {
     return "Offensive Defenseman";
   }
 
-  // Defensive Defenseman:
-  // Defense must be positive and higher than every other category.
-  // Possession must also be positive.
-  if (
-    d > 0 &&
-    c > 0 &&
-    d > s &&
-    d > p &&
-    d > c
-  ) {
-    return "Defensive Defenseman";
-  }
-
   // All Around Defenseman:
   // Possession and defense must both be positive.
   // Then either scoring OR playmaking has to sit within allAroundGap
@@ -1258,6 +1245,19 @@ function skaterArchetypeFromCategories(categoryPct, posGroup) {
     if (scoringFits || playmakingFits) {
       return "All Around Defenseman";
     }
+  }
+
+  // Defensive Defenseman:
+  // Defense must be positive and higher than every other category.
+  // Possession must also be positive.
+  if (
+    d > 0 &&
+    c > 0 &&
+    d > s &&
+    d > p &&
+    d > c
+  ) {
+    return "Defensive Defenseman";
   }
 
   return "Defenseman";
