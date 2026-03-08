@@ -1009,7 +1009,7 @@ skater: {
 
     "Offensive Defenseman":   { scoring: 0.15, playmaking: 0.30, possession: 0.30, defense: 0.25 },
     "Defensive Defenseman":   { scoring: 0.05, playmaking: 0.10, possession: 0.30, defense: 0.55 },
-    "All Around Defenseman":  { scoring: 0.10, playmaking: 0.20, possession: 0.30, defense: 0.40 },
+    "All Around Defenseman":  { scoring: 0.20, playmaking: 0.20, possession: 0.20, defense: 0.40 },
     "Defenseman":             { scoring: 0.10, playmaking: 0.20, possession: 0.35, defense: 0.35 },
 
     "Skater":                 { scoring: 0.25, playmaking: 0.25, possession: 0.25, defense: 0.25 },
@@ -1233,7 +1233,7 @@ function skaterArchetypeFromCategories(categoryPct, posGroup) {
   //
   // This creates a balanced D bucket without requiring both offense
   // categories to be strong at the same time.
-  if (c > 0 && d > 0) {
+  if (c > 0 && d > 0 && s > 0 && p > 0) {
     const scoringFits =
       Math.abs(s - c) <= allAroundGap &&
       Math.abs(s - d) <= allAroundGap;
