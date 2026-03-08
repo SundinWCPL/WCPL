@@ -1004,7 +1004,7 @@ skater: {
     "Sniper":                 { scoring: 0.50, playmaking: 0.15, possession: 0.20, defense: 0.15 },
     "Playmaker":              { scoring: 0.10, playmaking: 0.50, possession: 0.30, defense: 0.10 },
     "Dual Threat":            { scoring: 0.40, playmaking: 0.40, possession: 0.15, defense: 0.05 },
-    "2-Way Forward":          { scoring: 0.25, playmaking: 0.25, possession: 0.25, defense: 0.25 },
+    "2-Way Forward":          { scoring: 0.30, playmaking: 0.30, possession: 0.20, defense: 0.20 },
     "Forward":                { scoring: 0.30, playmaking: 0.30, possession: 0.20, defense: 0.20 },
 
     "Offensive Defenseman":   { scoring: 0.15, playmaking: 0.30, possession: 0.30, defense: 0.25 },
