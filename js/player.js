@@ -1027,6 +1027,15 @@ skater: {
     plug: -30,
     pylon: -50,
   },
+
+  goalie_rating_thresholds: {
+    superstar: 45,
+    elite: 30,
+    impact: 10,
+    average: -10,
+    plug: -40,
+    pylon: -60,
+  },
   rating_colors: {
     Superstar: "#d4af37",
     Elite: "#39d353",
@@ -1371,8 +1380,12 @@ function weightedOverallFromCategories(archetype, categoryPct) {
   return sum > 0 ? (weighted / sum) : null;
 }
 
-function ratingLabelFromScore(score) {
-  const t = PLAYER_ARCHETYPE_CONFIG.rating_thresholds;
+function ratingLabelFromScore(score, role = "SKATER") {
+  const t =
+    role === "GOALIE"
+      ? PLAYER_ARCHETYPE_CONFIG.goalie_rating_thresholds
+      : PLAYER_ARCHETYPE_CONFIG.rating_thresholds;
+
   const s = safeNum(score);
   if (s == null) return "Average";
   if (s >= t.superstar) return "Superstar";
@@ -1393,7 +1406,7 @@ function computePlayerArchetypeAndRating({ role, playerVals, leagueVals, pSeason
     const categoryPct = computeCategoryPctMap("GOALIE", playerVals, leagueVals);
     const score = safeNum(categoryPct?.goaltending);
     const archetype = goalieArchetypeFromSeasonRow(pSeason);
-    const rating = ratingLabelFromScore(score);
+    const rating = ratingLabelFromScore(score, "GOALIE");
     return { archetype, rating, score, categoryPct };
   }
 
