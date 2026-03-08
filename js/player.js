@@ -920,7 +920,7 @@ const SIGNED_KEYS_PLAYERBARS = new Set([
 
 const PLAYER_BARS_DELTA_CAP = 300;   // max absolute % contribution for normal stats
 const PLAYER_BARS_SIGNED_SCALE = 100; // signed diff stats like GFAx/GSAx use raw diff * this
-const PLAYER_BARS_WEIGHT_VISUAL_STRENGTH = 0.40; // 0 = no visual weight scaling, 1 = strongest
+const PLAYER_BARS_WEIGHT_VISUAL_STRENGTH = 0; // 0 = no visual weight scaling, 1 = strongest
 
 const PLAYER_BARS_CONFIG = {
   skater: [
@@ -975,10 +975,10 @@ const PLAYER_BARS_CONFIG = {
       key: "goaltending",
       label: "Goaltending",
       stats: [
-        { key: "sv_15", label: "SV/15", long: "Saves per 15", kind: "num", weight: 0.15 },
-        { key: "svp", label: "SV%", long: "Save Percentage", kind: "pct", weight: 0.30 },
-        { key: "gsax_15", label: "GSAx/15", long: "Goals Saved Above Expected per 15", kind: "num", weight: 0.30 },
-        { key: "ga_15", label: "GA/15", long: "Goals Against per 15", kind: "num", weight: 0.20 },
+        { key: "sv_15", label: "SV/15", long: "Saves per 15", kind: "num", weight: 0.25 },
+        { key: "svp", label: "SV%", long: "Save Percentage", kind: "pct", weight: 1 },
+        { key: "gsax_15", label: "GSAx/15", long: "Goals Saved Above Expected per 15", kind: "num", weight: 0.75 },
+        { key: "ga_15", label: "GA/15", long: "Goals Against per 15", kind: "num", weight: 0.25 },
         { key: "passes_15", label: "PASS/15", long: "Passes per 15", kind: "num", weight: 0.05 },
       ]
     }
@@ -1020,7 +1020,7 @@ skater: {
     body_share_threshold: 0.30,
   },
   rating_thresholds: {
-    superstar: 60,
+    superstar: 50,
     elite: 35,
     impact: 15,
     average: -15,
@@ -1452,6 +1452,18 @@ function pctVsLeague(key, playerVal, lgVal) {
   // Example: GFAx/15 of -0.37 vs league -0.04 should be negative, not +825%.
   if (SIGNED_KEYS_PLAYERBARS.has(key)) {
     let diff = (playerVal - lgVal) * PLAYER_BARS_SIGNED_SCALE;
+
+    if (diff > PLAYER_BARS_DELTA_CAP) diff = PLAYER_BARS_DELTA_CAP;
+    if (diff < -PLAYER_BARS_DELTA_CAP) diff = -PLAYER_BARS_DELTA_CAP;
+
+    return diff;
+  }
+
+  // Special handling for goalie SV%:
+  // use percentage-point difference instead of relative % vs league,
+  // then scale it so big SV% gaps matter more.
+  if (key === "svp") {
+    let diff = (playerVal - lgVal) * 5; // tune this multiplier as desired
 
     if (diff > PLAYER_BARS_DELTA_CAP) diff = PLAYER_BARS_DELTA_CAP;
     if (diff < -PLAYER_BARS_DELTA_CAP) diff = -PLAYER_BARS_DELTA_CAP;
