@@ -1007,10 +1007,10 @@ skater: {
     "2-Way Forward":          { scoring: 0.30, playmaking: 0.30, possession: 0.20, defense: 0.20 },
     "Forward":                { scoring: 0.30, playmaking: 0.30, possession: 0.20, defense: 0.20 },
 
-    "Offensive Defenseman":   { scoring: 0.15, playmaking: 0.30, possession: 0.30, defense: 0.25 },
-    "Defensive Defenseman":   { scoring: 0.05, playmaking: 0.10, possession: 0.30, defense: 0.55 },
-    "All Around Defenseman":  { scoring: 0.20, playmaking: 0.20, possession: 0.20, defense: 0.40 },
-    "Defenseman":             { scoring: 0.10, playmaking: 0.20, possession: 0.35, defense: 0.35 },
+    "Offensive Defenseman":   { scoring: 0.15, playmaking: 0.30, possession: 0.35, defense: 0.20 },
+    "Defensive Defenseman":   { scoring: 0.05, playmaking: 0.05, possession: 0.30, defense: 0.60 },
+    "All Around Defenseman":  { scoring: 0.10, playmaking: 0.10, possession: 0.30, defense: 0.50 },
+    "Defenseman":             { scoring: 0.05, playmaking: 0.15, possession: 0.30, defense: 0.50 },
 
     "Skater":                 { scoring: 0.25, playmaking: 0.25, possession: 0.25, defense: 0.25 },
   }
@@ -1020,8 +1020,8 @@ skater: {
     body_share_threshold: 0.30,
   },
   rating_thresholds: {
-    superstar: 50,
-    elite: 35,
+    superstar: 45,
+    elite: 30,
     impact: 15,
     average: -15,
     plug: -30,
