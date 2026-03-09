@@ -993,7 +993,7 @@ skater: {
     sniper_gap: 40,
     playmaker_gap: 10,
     two_way_gap: 30,
-    dual_threat_gap: 50,
+    dual_threat_gap: 55,
   },
   defense: {
     defensive_gap: 35,
@@ -1362,9 +1362,37 @@ function goalieArchetypeFromSeasonRow(pSeason) {
 }
 
 function weightedOverallFromCategories(archetype, categoryPct) {
-  const weights =
+  let weights =
     PLAYER_ARCHETYPE_CONFIG.skater.rating_weights[archetype] ||
     PLAYER_ARCHETYPE_CONFIG.skater.rating_weights.Skater;
+
+  // --- Context-aware smooth weights for 2-Way Forwards ---
+  if (archetype === "2-Way Forward") {
+    const s = Math.max(0, safeNum(categoryPct?.scoring) ?? 0);
+    const p = Math.max(0, safeNum(categoryPct?.playmaking) ?? 0);
+
+    const total = s + p;
+
+    if (total > 0) {
+      const sShare = s / total;
+      const pShare = p / total;
+
+      weights = {
+        scoring: 0.10 + (0.35 * sShare),
+        playmaking: 0.10 + (0.35 * pShare),
+        possession: 0.20,
+        defense: 0.25
+      };
+    } else {
+      // fallback if both scoring and playmaking are 0 or negative
+      weights = {
+        scoring: 0.275,
+        playmaking: 0.275,
+        possession: 0.20,
+        defense: 0.25
+      };
+    }
+  }
 
   let weighted = 0;
   let sum = 0;
