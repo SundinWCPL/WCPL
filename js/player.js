@@ -1001,7 +1001,7 @@ skater: {
     all_around_gap: 50,
   },
   rating_weights: {
-    "Sniper":                 { scoring: 0.50, playmaking: 0.15, possession: 0.20, defense: 0.15 },
+    "Sniper":                 { scoring: 0.50, playmaking: 0.15, possession: 0.25, defense: 0.10 },
     "Playmaker":              { scoring: 0.10, playmaking: 0.50, possession: 0.30, defense: 0.10 },
     "Dual Threat":            { scoring: 0.40, playmaking: 0.40, possession: 0.15, defense: 0.05 },
     "2-Way Forward":          { scoring: 0.30, playmaking: 0.30, possession: 0.20, defense: 0.20 },
