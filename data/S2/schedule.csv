@@ -50,9 +50,9 @@ M16-G3,4,LBR,CG67,reg,final,2026-03-08
 M17-G1,5,BRG,CG67,reg,final,2026-03-10
 M17-G2,5,BRG,CG67,reg,final,2026-03-10
 M17-G3,5,BRG,CG67,reg,final,2026-03-10
-M18-G1,5,FOX,TOR,reg,scheduled,
-M18-G2,5,FOX,TOR,reg,scheduled,
-M18-G3,5,FOX,TOR,reg,scheduled,
+M18-G1,5,FOX,TOR,reg,final,2026-03-11
+M18-G2,5,FOX,TOR,reg,final,2026-03-11
+M18-G3,5,FOX,TOR,reg,final,2026-03-11
 M19-G1,5,LBR,BB,reg,scheduled,
 M19-G2,5,LBR,BB,reg,scheduled,
 M19-G3,5,LBR,BB,reg,scheduled,
