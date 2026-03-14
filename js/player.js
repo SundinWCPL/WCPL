@@ -1001,14 +1001,14 @@ skater: {
     all_around_gap: 50,
   },
   rating_weights: {
-    "Sniper":                 { scoring: 0.50, playmaking: 0.15, possession: 0.25, defense: 0.10 },
+    "Sniper":                 { scoring: 0.50, playmaking: 0.10, possession: 0.30, defense: 0.10 },
     "Playmaker":              { scoring: 0.10, playmaking: 0.50, possession: 0.30, defense: 0.10 },
-    "Dual Threat":            { scoring: 0.40, playmaking: 0.40, possession: 0.15, defense: 0.05 },
-    "2-Way Forward":          { scoring: 0.30, playmaking: 0.30, possession: 0.20, defense: 0.20 },
-    "Forward":                { scoring: 0.30, playmaking: 0.30, possession: 0.20, defense: 0.20 },
+    "Dual Threat":            { scoring: 0.35, playmaking: 0.35, possession: 0.25, defense: 0.05 },
+    "2-Way Forward":          { scoring: 0.25, playmaking: 0.25, possession: 0.25, defense: 0.25 },
+    "Forward":                { scoring: 0.35, playmaking: 0.35, possession: 0.20, defense: 0.10 },
 
-    "Offensive Defenseman":   { scoring: 0.15, playmaking: 0.30, possession: 0.35, defense: 0.20 },
-    "Defensive Defenseman":   { scoring: 0.05, playmaking: 0.05, possession: 0.30, defense: 0.60 },
+    "Offensive Defenseman":   { scoring: 0.25, playmaking: 0.25, possession: 0.30, defense: 0.20 },
+    "Defensive Defenseman":   { scoring: 0.05, playmaking: 0.05, possession: 0.25, defense: 0.65 },
     "All Around Defenseman":  { scoring: 0.10, playmaking: 0.10, possession: 0.30, defense: 0.50 },
     "Defenseman":             { scoring: 0.05, playmaking: 0.15, possession: 0.30, defense: 0.50 },
 
@@ -1390,6 +1390,62 @@ function weightedOverallFromCategories(archetype, categoryPct) {
         playmaking: 0.275,
         possession: 0.20,
         defense: 0.25
+      };
+    }
+  }
+  
+    // --- Context-aware smooth weights for generic Forwards ---
+  if (archetype === "Forward") {
+    const s = Math.max(0, safeNum(categoryPct?.scoring) ?? 0);
+    const p = Math.max(0, safeNum(categoryPct?.playmaking) ?? 0);
+
+    const total = s + p;
+
+    if (total > 0) {
+      const sShare = s / total;
+      const pShare = p / total;
+
+      weights = {
+        scoring: 0.05 + (0.30 * sShare),
+        playmaking: 0.05 + (0.30 * pShare),
+        possession: 0.20,
+        defense: 0.10
+      };
+    } else {
+      // fallback if both scoring and playmaking are 0 or negative
+      weights = {
+        scoring: 0.25,
+        playmaking: 0.25,
+        possession: 0.20,
+        defense: 0.20
+      };
+    }
+  }
+
+  // --- Context-aware smooth weights for Offensive Defensemen ---
+  if (archetype === "Offensive Defenseman") {
+    const s = Math.max(0, safeNum(categoryPct?.scoring) ?? 0);
+    const p = Math.max(0, safeNum(categoryPct?.playmaking) ?? 0);
+
+    const total = s + p;
+
+    if (total > 0) {
+      const sShare = s / total;
+      const pShare = p / total;
+
+      weights = {
+        scoring:   0.05 + (0.40 * sShare),
+        playmaking:0.05 + (0.40 * pShare),
+        possession: 0.30,
+        defense:    0.20
+      };
+    } else {
+      // fallback if both scoring and playmaking are 0 or negative
+      weights = {
+        scoring: 0.225,
+        playmaking: 0.225,
+        possession: 0.35,
+        defense: 0.20
       };
     }
   }
