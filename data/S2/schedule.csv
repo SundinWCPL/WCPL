@@ -59,9 +59,9 @@ M19-G3,5,RR,MOFO,reg,final,2026-03-13
 M20-G1,5,LBR,BB,reg,final,2026-03-15
 M20-G2,5,LBR,BB,reg,final,2026-03-15
 M20-G3,5,LBR,BB,reg,final,2026-03-15
-M21-G1,6,BRG,PP,reg,scheduled,
-M21-G2,6,BRG,PP,reg,scheduled,
-M21-G3,6,BRG,PP,reg,scheduled,
+M21-G1,6,BRG,PP,reg,final,2026-03-19
+M21-G2,6,BRG,PP,reg,final,2026-03-19
+M21-G3,6,BRG,PP,reg,final,2026-03-19
 M22-G1,6,CG67,FOX,reg,scheduled,
 M22-G2,6,CG67,FOX,reg,scheduled,
 M22-G3,6,CG67,FOX,reg,scheduled,
