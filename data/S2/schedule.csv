@@ -65,9 +65,9 @@ M21-G3,6,BRG,PP,reg,final,2026-03-19
 M22-G1,6,TOR,LBR,reg,final,2026-03-22
 M22-G2,6,TOR,LBR,reg,final,2026-03-22
 M22-G3,6,TOR,LBR,reg,final,2026-03-22
-M23-G1,6,CG67,FOX,reg,final,2026-03-23
-M23-G2,6,CG67,FOX,reg,final,2026-03-23
-M23-G3,6,CG67,FOX,reg,final,2026-03-23
+M23-G1,6,FOX,CG67,reg,final,2026-03-23
+M23-G2,6,FOX,CG67,reg,final,2026-03-23
+M23-G3,6,FOX,CG67,reg,final,2026-03-23
 M24-G1,6,RR,BB,reg,scheduled,
 M24-G2,6,RR,BB,reg,scheduled,
 M24-G3,6,RR,BB,reg,scheduled,
