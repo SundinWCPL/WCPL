@@ -89,9 +89,9 @@ M29-G3,8,BB,TOR,reg,final,2026-04-04
 M30-G1,8,LBR,RR,reg,final,2026-04-05
 M30-G2,8,LBR,RR,reg,final,2026-04-05
 M30-G3,8,LBR,RR,reg,final,2026-04-05
-M31-G1,8,CG67,PP,reg,scheduled,
-M31-G2,8,CG67,PP,reg,scheduled,
-M31-G3,8,CG67,PP,reg,scheduled,
+M31-G1,8,CG67,PP,reg,final,2026-04-08
+M31-G2,8,CG67,PP,reg,final,2026-04-08
+M31-G3,8,CG67,PP,reg,final,2026-04-08
 M32-G1,8,MOFO,BRG,reg,scheduled,
 M32-G2,8,MOFO,BRG,reg,scheduled,
 M32-G3,8,MOFO,BRG,reg,scheduled,
