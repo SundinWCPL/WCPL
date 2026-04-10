@@ -872,21 +872,34 @@ const showClinchMarks = spots > 0 && !everyoneMakesIt;
 for (const r of rows) {
   const remainingGames = Math.max(0, (r.SCHED_GP ?? r.GP) - r.GP);
   r.REM = remainingGames;
-  r.MAXPTS = r.PTS + (remainingGames * 3); // reg win = 3 pts max per remaining game
+  r.MAXPTS = r.PTS + (remainingGames * 3);
   r.playoffMark = "";
 }
 
 if (showClinchMarks) {
-  const bestOutsideMaxPts = Math.max(
-    ...rows.slice(spots).map(r => r.MAXPTS)
-  );
-
-  const cutoffPts = rows[spots - 1]?.PTS ?? null;
-
   for (const r of rows) {
-    if (r.PTS > bestOutsideMaxPts) {
+    let canStillFinishAhead = 0;
+    let alreadyGuaranteedAhead = 0;
+
+    for (const o of rows) {
+      if (o.team_id === r.team_id) continue;
+
+      // Conservative: if another team can tie your current points,
+      // they might still finish ahead on tiebreakers.
+      if (o.MAXPTS > r.PTS || o.MAXPTS === r.PTS) {
+        canStillFinishAhead++;
+      }
+
+      // Conservative: if another team already has your max points,
+      // they might still finish ahead on tiebreakers.
+      if (o.PTS > r.MAXPTS || o.PTS === r.MAXPTS) {
+        alreadyGuaranteedAhead++;
+      }
+    }
+
+    if (canStillFinishAhead < spots) {
       r.playoffMark = "X";
-    } else if (cutoffPts !== null && r.MAXPTS < cutoffPts) {
+    } else if (alreadyGuaranteedAhead >= spots) {
       r.playoffMark = "E";
     }
   }
