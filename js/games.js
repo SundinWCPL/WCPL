@@ -202,12 +202,13 @@ function renderSeries() {
     const stage = (s.stage ?? "").trim().toLowerCase();
     const status = (s.status ?? "").trim().toLowerCase();
 
-    if (stageMode === "reg") {
-	if (stage !== "reg") continue;
-	} else {
-	// Playoffs mode: include qf/sf/f
-	if (stage === "reg") continue;
-	}
+if (stageMode === "reg") {
+	// Treat All-Star ("as") like regular season for display
+	if (stage !== "reg" && stage !== "as") continue;
+} else {
+	// Playoffs mode: include qf/sf/f only
+	if (stage === "reg" || stage === "as") continue;
+}
 
     if (status === "cancelled") continue;
 
@@ -383,7 +384,7 @@ for (const r of filteredRows) {
     : null;
 
   const home = tmap.get(r.home_team_id) || fallbackTeam(r.home_team_id);
-  tr.appendChild(tdTeamLogoOnly(home, seasonId, homeOutcome));
+  tr.appendChild(tdTeamLogoOnly(home, seasonId, homeOutcome, r.stage, "home"));
 
   const tdVs = document.createElement("td");
   tdVs.className = "vs-cell";
@@ -391,7 +392,7 @@ for (const r of filteredRows) {
   tr.appendChild(tdVs);
 
   const away = tmap.get(r.away_team_id) || fallbackTeam(r.away_team_id);
-  tr.appendChild(tdTeamLogoOnly(away, seasonId, awayOutcome));
+  tr.appendChild(tdTeamLogoOnly(away, seasonId, awayOutcome, r.stage, "away"));
 
   const tdSpacer = document.createElement("td");
   tdSpacer.className = "spacer-col";
@@ -497,31 +498,71 @@ function tdGameResult(game, seasonId) {
 }
 
 
-function tdTeamLogoOnly(team, seasonId, outcome /* "win" | "lose" | null */) {
+function tdTeamLogoOnly(
+  team,
+  seasonId,
+  outcome,
+  stage = "reg",
+  side = ""
+) {
   const td = document.createElement("td");
   td.className = "logo-cell";
 
-  const a = document.createElement("a");
-  a.href = `team.html?season=${encodeURIComponent(seasonId)}&team_id=${encodeURIComponent(team.team_id)}`;
-  a.style.display = "inline-block";
-
-  // If you added the games-page badge CSS earlier, this keeps it tidy.
-  // If not, it still works (just a normal div).
   const badge = document.createElement("div");
   badge.className = "logo-badge";
+
   if (outcome === "win") badge.classList.add("series-winner");
-else if (outcome === "lose") badge.classList.add("series-loser");
-  if (team.bg_color) badge.style.backgroundColor = team.bg_color;
+  else if (outcome === "lose") badge.classList.add("series-loser");
+
+  // --- ALL-STAR SPECIAL CASE ---
+if (stage === "as") {
+  const a = document.createElement("a");
+  a.href = "#";
+  a.style.display = "inline-block";
+  a.style.textDecoration = "none";
+  a.addEventListener("click", (e) => e.preventDefault());
+
+  // Red for home, Blue for away
+  badge.style.backgroundColor =
+    (side === "home") ? "#cc0000" : "#0033cc";
+
+  badge.style.display = "flex";
+  badge.style.alignItems = "center";
+  badge.style.justifyContent = "center";
+  badge.style.fontWeight = "700";
+  badge.style.color = "#ffffff";
+
+  badge.textContent =
+    (side === "home") ? "RED" : "BLUE";
+
+  a.appendChild(badge);
+  td.appendChild(a);
+  return td;
+}
+
+  // --- NORMAL TEAM LOGO ---
+  const a = document.createElement("a");
+  a.href =
+    `team.html?season=${encodeURIComponent(seasonId)}&team_id=${encodeURIComponent(team.team_id)}`;
+
+  a.style.display = "inline-block";
+
+  if (team.bg_color)
+    badge.style.backgroundColor = team.bg_color;
 
   const img = document.createElement("img");
   img.alt = `${team.team_id} logo`;
   img.loading = "lazy";
-  img.src = `../logos/${seasonId}/${team.team_id}.png`;
-  img.onerror = () => (img.style.visibility = "hidden");
+  img.src =
+    `../logos/${seasonId}/${team.team_id}.png`;
+
+  img.onerror = () =>
+    (img.style.visibility = "hidden");
 
   badge.appendChild(img);
   a.appendChild(badge);
   td.appendChild(a);
+
   return td;
 }
 
@@ -588,6 +629,13 @@ function groupLabelForRow(r, stageMode) {
   if (stageMode === "po") {
     return { label: stageLabelLong(String(r.stage ?? "")), sub: "" };
   }
+
   const wk = (r.week ?? "");
+  const stage = String(r.stage ?? "").toLowerCase();
+
+  if (stage === "as") {
+    return { label: `Week ${wk} - All-Star Game`, sub: "" };
+  }
+
   return { label: `Week ${wk}`, sub: "" };
 }

@@ -348,8 +348,8 @@ card.addEventListener("keydown", (e) => {
   card.appendChild(top);
 
   // Two team rows (away then home)
-  card.appendChild(buildSchedTeamRow(seasonId, it.away, it.awayTeam, it.played ? it.ag : null));
-  card.appendChild(buildSchedTeamRow(seasonId, it.home, it.homeTeam, it.played ? it.hg : null));
+card.appendChild(buildSchedTeamRow(seasonId, it.away, it.awayTeam, it.played ? it.ag : null, "away"));
+card.appendChild(buildSchedTeamRow(seasonId, it.home, it.homeTeam, it.played ? it.hg : null, "home"));
 
   // ----- Footer status -----
   const foot = document.createElement("div");
@@ -420,9 +420,22 @@ function groupScheduleIntoSeries(items) {
   return Array.from(map.values()).sort((a, b) => a.sortKey - b.sortKey);
 }
 
-function buildSchedLogo(seasonId, teamId, teamRow) {
+function buildSchedLogo(seasonId, teamId, teamRow, side = "") {
   const logoWrap = document.createElement("div");
   logoWrap.className = "sched-logo";
+
+  // Fallback for teams not found in teams.csv
+  if (!teamRow) {
+    logoWrap.style.backgroundColor = (side === "home") ? "#cc0000" : "#0033cc";
+    logoWrap.style.color = "#ffffff";
+    logoWrap.style.display = "flex";
+    logoWrap.style.alignItems = "center";
+    logoWrap.style.justifyContent = "center";
+    logoWrap.style.fontWeight = "700";
+    logoWrap.textContent = (side === "home") ? "RED" : "BLUE";
+    return logoWrap;
+  }
+
   if (teamRow?.bg_color) logoWrap.style.backgroundColor = teamRow.bg_color;
 
   const img = document.createElement("img");
@@ -462,8 +475,8 @@ function buildSeriesCard(seasonId, seriesItems) {
 
   const teamsCol = document.createElement("div");
   teamsCol.className = "series-teams";
-teamsCol.appendChild(buildSchedLogo(seasonId, first.home, first.homeTeam));
-teamsCol.appendChild(buildSchedLogo(seasonId, first.away, first.awayTeam));
+teamsCol.appendChild(buildSchedLogo(seasonId, first.home, first.homeTeam, "home"));
+teamsCol.appendChild(buildSchedLogo(seasonId, first.away, first.awayTeam, "away"));
 
   const gamesRow = document.createElement("div");
   gamesRow.className = "series-games";
@@ -558,6 +571,7 @@ cell.appendChild(gLabel);
 function stageLabel(stage) {
   switch (String(stage ?? "").toLowerCase()) {
     case "reg": return "Regular Season";
+	case "as":  return "All-Star Game";
     case "qf":  return "Quarter Finals";
     case "sf":  return "Semi Finals";
     case "f":   return "WCPL Championship";
@@ -635,7 +649,7 @@ function parseMatchGameNumber(matchId) {
   return m ? Number(m[1]) : 0;
 }
 
-function buildSchedTeamRow(seasonId, teamId, teamRow, score) {
+function buildSchedTeamRow(seasonId, teamId, teamRow, score, side = "") {
   const row = document.createElement("div");
   row.className = "sched-row";
 
@@ -644,18 +658,34 @@ function buildSchedTeamRow(seasonId, teamId, teamRow, score) {
 
   const logoWrap = document.createElement("div");
   logoWrap.className = "sched-logo";
-  if (teamRow?.bg_color) logoWrap.style.backgroundColor = teamRow.bg_color;
 
-  const img = document.createElement("img");
-  img.loading = "lazy";
-  img.alt = `${teamId} logo`;
-  img.src = `logos/${seasonId}/${teamId}.png`;
-  img.onerror = () => (img.style.visibility = "hidden");
-  logoWrap.appendChild(img);
+  if (!teamRow) {
+    logoWrap.style.backgroundColor = (side === "home") ? "#cc0000" : "#0033cc";
+    logoWrap.style.color = "#ffffff";
+    logoWrap.style.display = "flex";
+    logoWrap.style.alignItems = "center";
+    logoWrap.style.justifyContent = "center";
+    logoWrap.style.fontWeight = "700";
+    logoWrap.textContent = (side === "home") ? "RED" : "BLUE";
+  } else {
+    if (teamRow?.bg_color) logoWrap.style.backgroundColor = teamRow.bg_color;
+
+    const img = document.createElement("img");
+    img.loading = "lazy";
+    img.alt = `${teamId} logo`;
+    img.src = `logos/${seasonId}/${teamId}.png`;
+    img.onerror = () => (img.style.visibility = "hidden");
+    logoWrap.appendChild(img);
+  }
 
   const name = document.createElement("div");
   name.className = "sched-team";
   name.textContent = teamId || "";
+
+  // Optional: also color the name text white when team is missing
+  if (!teamRow) {
+    name.style.color = "#ffffff";
+  }
 
   left.appendChild(logoWrap);
   left.appendChild(name);
