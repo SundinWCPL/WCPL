@@ -27,6 +27,9 @@ let teams = [];
 let players = [];
 let games = [];
 let schedule = [];
+let currentSeasonSettings = {
+  playoffTeamsPerConf: 0,
+};
 
 boot();
 
@@ -106,6 +109,12 @@ const [seasons, tRows, gRows, sRows] = await Promise.all([
   loadCSV(gamesPath),
   loadCSV(schedPath),
 ]);
+
+const seasonRow =
+  seasons.find(r => String(r.season_id ?? "").trim() === seasonId) ?? null;
+
+currentSeasonSettings.playoffTeamsPerConf =
+  Math.max(0, toIntMaybe(seasonRow?.playoff_teams_per_conf) ?? 0);
 
 // Now we can detect whether playoffs have begun
 const playoffsBegun = playoffsHaveBegun(sRows, gRows);
@@ -674,6 +683,34 @@ function renderStandings(seasonId) {
     const st = String(s.stage ?? "").trim().toLowerCase();
     if (mid && st) stageByMatch.set(mid, st);
   }
+  
+const playoffTeamsPerConf = Math.max(
+  0,
+  toIntMaybe(currentSeasonSettings.playoffTeamsPerConf) ?? 0
+);
+
+// Count scheduled regular-season games per team from schedule.csv
+const scheduledRegGamesByTeam = new Map();
+for (const s of schedule) {
+  const st = String(s.stage ?? "").trim().toLowerCase();
+  if (st !== "reg") continue;
+
+  const home = String(s.home_team_id ?? "").trim();
+  const away = String(s.away_team_id ?? "").trim();
+
+  if (home) {
+    scheduledRegGamesByTeam.set(
+      home,
+      (scheduledRegGamesByTeam.get(home) ?? 0) + 1
+    );
+  }
+  if (away) {
+    scheduledRegGamesByTeam.set(
+      away,
+      (scheduledRegGamesByTeam.get(away) ?? 0) + 1
+    );
+  }
+}
 
   // Build team map
   const tmap = new Map();
@@ -693,6 +730,13 @@ tmap.set(team_id, {
   ShF: 0, ShA: 0
 });
   }
+
+// Track head-to-head wins
+const h2hWins = new Map(); // key = "A|B" → Map(team → wins)
+
+function h2hKey(a, b) {
+  return (a < b) ? `${a}|${b}` : `${b}|${a}`;
+}
 
   // Compute standings (regular season only)
   for (const g of games) {
@@ -729,32 +773,58 @@ if (aShots !== null) {
   homeRow.ShA += aShots;
 }
 
-    const isOT = ot > 0;
-    const homeWin = hg > ag;
+const isOT = ot > 0;
+const homeWin = hg > ag;
 
-    if (!isOT) {
-      // Reg W=3, Reg L=0
-      if (homeWin) { homeRow.W++; homeRow.PTS += 3; awayRow.L++; }
-      else { awayRow.W++; awayRow.PTS += 3; homeRow.L++; }
-    } else {
-      // OTW=2, OTL=1
-      if (homeWin) {
-        homeRow.OTW++; homeRow.PTS += 2;
-        awayRow.OTL++; awayRow.PTS += 1;
-      } else {
-        awayRow.OTW++; awayRow.PTS += 2;
-        homeRow.OTL++; homeRow.PTS += 1;
-      }
-    }
+if (!isOT) {
+  // Reg W=3, Reg L=0
+  if (homeWin) { homeRow.W++; homeRow.PTS += 3; awayRow.L++; }
+  else { awayRow.W++; awayRow.PTS += 3; homeRow.L++; }
+} else {
+  // OTW=2, OTL=1
+  if (homeWin) {
+    homeRow.OTW++; homeRow.PTS += 2;
+    awayRow.OTL++; awayRow.PTS += 1;
+  } else {
+    awayRow.OTW++; awayRow.PTS += 2;
+    homeRow.OTL++; homeRow.PTS += 1;
+  }
+}
+
+// Record head-to-head wins
+const winnerId = homeWin ? home : away;
+const key = h2hKey(home, away);
+
+if (!h2hWins.has(key)) {
+  h2hWins.set(key, new Map());
+}
+
+const winMap = h2hWins.get(key);
+winMap.set(winnerId, (winMap.get(winnerId) ?? 0) + 1);
   }
 
+function compareHeadToHead(a, b) {
+  const key = h2hKey(a.team_id, b.team_id);
+  const winMap = h2hWins.get(key);
+
+  if (!winMap) return 0;
+
+  const aWins = winMap.get(a.team_id) ?? 0;
+  const bWins = winMap.get(b.team_id) ?? 0;
+
+  return bWins - aWins; // higher wins ranks higher
+}
   // Group by conference
   const confMap = new Map();
-  for (const r of tmap.values()) {
-    const c = r.conference || "Conference";
-    if (!confMap.has(c)) confMap.set(c, []);
-    confMap.get(c).push({ ...r, DIFF: r.GF - r.GA });
-  }
+for (const r of tmap.values()) {
+  const c = r.conference || "Conference";
+  if (!confMap.has(c)) confMap.set(c, []);
+  confMap.get(c).push({
+    ...r,
+    DIFF: r.GF - r.GA,
+    SCHED_GP: scheduledRegGamesByTeam.get(r.team_id) ?? r.GP,
+  });
+}
 
   const confs = [...confMap.keys()].sort((a, b) =>
     a.localeCompare(b, undefined, { sensitivity: "base" })
@@ -783,12 +853,44 @@ document.querySelector(".home-two")?.classList.toggle("two-conf", isTwoConf);
     const rows = confMap.get(confName) ?? [];
 
     // Sort within conference
-    rows.sort((a, b) =>
-      (b.PTS - a.PTS) ||
-      (b.DIFF - a.DIFF) ||
-      (b.GF - a.GF) ||
-      String(a.team_name ?? "").localeCompare(String(b.team_name ?? ""), undefined, { sensitivity: "base" })
-    );
+rows.sort((a, b) =>
+  (b.PTS - a.PTS) ||
+  (b.DIFF - a.DIFF) ||
+  compareHeadToHead(a, b) ||
+  String(a.team_name ?? "").localeCompare(
+    String(b.team_name ?? ""),
+    undefined,
+    { sensitivity: "base" }
+  )
+);
+	
+const spots = playoffTeamsPerConf;
+const everyoneMakesIt = spots >= rows.length;
+const showClinchMarks = spots > 0 && !everyoneMakesIt;
+
+// Compute max possible points for each team
+for (const r of rows) {
+  const remainingGames = Math.max(0, (r.SCHED_GP ?? r.GP) - r.GP);
+  r.REM = remainingGames;
+  r.MAXPTS = r.PTS + (remainingGames * 3); // reg win = 3 pts max per remaining game
+  r.playoffMark = "";
+}
+
+if (showClinchMarks) {
+  const bestOutsideMaxPts = Math.max(
+    ...rows.slice(spots).map(r => r.MAXPTS)
+  );
+
+  const cutoffPts = rows[spots - 1]?.PTS ?? null;
+
+  for (const r of rows) {
+    if (r.PTS > bestOutsideMaxPts) {
+      r.playoffMark = "X";
+    } else if (cutoffPts !== null && r.MAXPTS < cutoffPts) {
+      r.playoffMark = "E";
+    }
+  }
+}
 
     const block = document.createElement("div");
 
@@ -844,14 +946,29 @@ document.querySelector(".home-two")?.classList.toggle("two-conf", isTwoConf);
   tdLogo.appendChild(img);
   tr.appendChild(tdLogo);
 
-  // Team link
-  const tdTeam = document.createElement("td");
-  const a = document.createElement("a");
-  a.className = "team-link";
-  a.href = `pages/team.html?season=${encodeURIComponent(seasonId)}&team_id=${encodeURIComponent(r.team_id)}`;
-  a.textContent = r.team_name || r.team_id;
-  tdTeam.appendChild(a);
-  tr.appendChild(tdTeam);
+// Team link + playoff marker
+const tdTeam = document.createElement("td");
+tdTeam.className = "left";
+
+const teamWrap = document.createElement("div");
+teamWrap.className = "standings-team-wrap";
+
+const a = document.createElement("a");
+a.className = "team-link";
+a.href = `pages/team.html?season=${encodeURIComponent(seasonId)}&team_id=${encodeURIComponent(r.team_id)}`;
+a.textContent = r.team_name || r.team_id;
+
+teamWrap.appendChild(a);
+
+if (r.playoffMark) {
+  const mark = document.createElement("span");
+  mark.className = `standings-marker ${r.playoffMark === "X" ? "is-clinched" : "is-eliminated"}`;
+  mark.textContent = r.playoffMark;
+  teamWrap.appendChild(mark);
+}
+
+tdTeam.appendChild(teamWrap);
+tr.appendChild(tdTeam);
 
   tr.appendChild(tdNum(r.GP));
   tr.appendChild(tdNum(r.W));
@@ -879,8 +996,12 @@ tr.appendChild(tdPctText(svPct, 1));
 
   tbody.appendChild(tr);
 
-  // 🔥 Add playoff cutoff line after 6th place (idx = 5)
-if (rows.length === 9 && idx === 5) {
+// Add playoff cutoff line after the last playoff spot
+if (
+  playoffTeamsPerConf > 0 &&
+  playoffTeamsPerConf < rows.length &&
+  idx === playoffTeamsPerConf - 1
+) {
   const cutoff = document.createElement("tr");
   cutoff.className = "playoff-cutoff-row";
 
