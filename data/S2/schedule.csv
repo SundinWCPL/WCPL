@@ -80,9 +80,9 @@ M26-G3,7,MOFO,BB,reg,final,2026-03-29
 M27-G1,7,CG67,TOR,reg,final,2026-03-31
 M27-G2,7,CG67,TOR,reg,final,2026-03-31
 M27-G3,7,CG67,TOR,reg,final,2026-03-31
-M28-G1,7,BRG,RR,reg,scheduled,
-M28-G2,7,BRG,RR,reg,scheduled,
-M28-G3,7,BRG,RR,reg,scheduled,
+M28-G1,7,BRG,RR,reg,final,2026-04-10
+M28-G2,7,BRG,RR,reg,final,2026-04-10
+M28-G3,7,BRG,RR,reg,final,2026-04-10
 M29-G1,8,BB,TOR,reg,final,2026-04-04
 M29-G2,8,BB,TOR,reg,final,2026-04-04
 M29-G3,8,BB,TOR,reg,final,2026-04-04
