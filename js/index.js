@@ -1574,9 +1574,13 @@ if (awayIsRealTeam) {
       col.appendChild(card);
     }
 
-    if (r.st === "f" && finalsChampionId) {
-      col.appendChild(buildChampionCard(seasonId, finalsChampionId, finalsChampionRow));
-    }
+if (r.st === "f") {
+  col.appendChild(
+    finalsChampionId
+      ? buildChampionCard(seasonId, finalsChampionId, finalsChampionRow)
+      : buildChampionPlaceholderCard(seasonId)
+  );
+}
 
     elHomePlayoffsWrap.appendChild(col);
   }
@@ -1640,6 +1644,33 @@ function buildChampionCard(seasonId, champTeamId, champTeamRow) {
   return card;
 }
 
+function buildChampionPlaceholderCard(seasonId) {
+  const card = document.createElement("div");
+  card.className = "series-card champion-card";
+
+  const inner = document.createElement("div");
+  inner.className = "champion-row";
+
+  const textWrap = document.createElement("div");
+  textWrap.className = "champion-text";
+
+  const seasonNum = seasonNumberFromId(seasonId);
+
+  const teamLine = document.createElement("div");
+  teamLine.className = "champion-team";
+  teamLine.textContent = "To Be Determined";
+
+  const champLine = document.createElement("div");
+  champLine.className = "champion-sub";
+  champLine.textContent = `WCPL SEASON ${seasonNum ?? seasonId} CHAMPIONS`;
+
+  textWrap.appendChild(teamLine);
+  textWrap.appendChild(champLine);
+  inner.appendChild(textWrap);
+  card.appendChild(inner);
+
+  return card;
+}
 function seriesWinNoteFromSeries(seasonId, stage, seriesItems){
   // Count wins across the series
   const wins = new Map(); // team_id -> wins
