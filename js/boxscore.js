@@ -137,23 +137,39 @@ if (advOn && !played) {
     }
 
     // Scheduled preview (or played without full stats but still can show summary)
-    if (!played) {
-      // Preview rosters use players (reg/playoffs)
-      const playersPath =
-        (stage === "reg")
-          ? `../data/${seasonId}/players.csv`
-          : `../data/${seasonId}/players_playoffs.csv`;
+if (!played) {
+  let regPlayers = [];
+  let playoffPlayers = [];
 
-      try { players = await loadCSV(playersPath); }
-      catch { players = []; }
-	  playerMaps = buildPlayerMaps(players);
+  try { regPlayers = await loadCSV(`../data/${seasonId}/players.csv`); }
+  catch { regPlayers = []; }
 
-      renderPreviewRosters(seasonId, homeTeam, awayTeam, players, advOn);
-      show(elPreviewRosters);
+  if (stage !== "reg") {
+    try { playoffPlayers = await loadCSV(`../data/${seasonId}/players_playoffs.csv`); }
+    catch { playoffPlayers = []; }
+  }
 
-      setLoading(false);
-      return;
-    }
+  const previewPlayers =
+    (stage === "reg")
+      ? regPlayers
+      : buildPreviewPlayersForPlayoffs({
+          scheduleRows: schedule,
+          gamesRows: games,
+          homeTeamId: homeTeam.team_id,
+          awayTeamId: awayTeam.team_id,
+          regPlayers,
+          playoffPlayers
+        });
+
+  players = previewPlayers;
+  playerMaps = buildPlayerMaps(players);
+
+  renderPreviewRosters(seasonId, homeTeam, awayTeam, players, advOn);
+  show(elPreviewRosters);
+
+  setLoading(false);
+  return;
+}
 
     // Played game:
     // Full nerd boxscore only if advOn and we have per-player rows for match_id.
@@ -658,6 +674,60 @@ if (hs != null && as != null) {
   return out;
 }
 
+function teamHasPlayedPlayoffGame(teamId, scheduleRows, gamesRows) {
+  const gameById = new Map(
+    (gamesRows || []).map(g => [String(g.match_id ?? "").trim(), g])
+  );
+
+  for (const s of scheduleRows || []) {
+    const stage = String(s.stage ?? "").trim().toLowerCase();
+    if (!stage || stage === "reg") continue;
+
+    const homeId = String(s.home_team_id ?? "").trim();
+    const awayId = String(s.away_team_id ?? "").trim();
+
+    if (homeId !== teamId && awayId !== teamId) continue;
+
+    const matchId = String(s.match_id ?? "").trim();
+    const status = String(s.status ?? "").trim().toLowerCase();
+    const g = gameById.get(matchId) || null;
+
+    const actuallyPlayed = (status === "played") || hasScore(g);
+    if (actuallyPlayed) return true;
+  }
+
+  return false;
+}
+
+function buildPreviewPlayersForPlayoffs({
+  scheduleRows,
+  gamesRows,
+  homeTeamId,
+  awayTeamId,
+  regPlayers,
+  playoffPlayers
+}) {
+  const homeHasPlayed = teamHasPlayedPlayoffGame(homeTeamId, scheduleRows, gamesRows);
+  const awayHasPlayed = teamHasPlayedPlayoffGame(awayTeamId, scheduleRows, gamesRows);
+
+  const out = [];
+
+  // Home team
+  if (homeHasPlayed) {
+    out.push(...(playoffPlayers || []).filter(p => String(p.team_id ?? "").trim() === homeTeamId));
+  } else {
+    out.push(...(regPlayers || []).filter(p => String(p.team_id ?? "").trim() === homeTeamId));
+  }
+
+  // Away team
+  if (awayHasPlayed) {
+    out.push(...(playoffPlayers || []).filter(p => String(p.team_id ?? "").trim() === awayTeamId));
+  } else {
+    out.push(...(regPlayers || []).filter(p => String(p.team_id ?? "").trim() === awayTeamId));
+  }
+
+  return out;
+}
 function ensureTeam(map, teamId) {
   if (!map.has(teamId)) map.set(teamId, blankTeamStats());
 }

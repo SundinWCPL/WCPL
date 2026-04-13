@@ -1286,111 +1286,113 @@ function isPlayoffStage(st){
 // Group games into a "series" by (stage + the two teams).
 // Winner is determined by the LAST completed game in that series.
 function renderPlayoffsBracket(seasonId, teams, games, schedule){
-  const teamById = new Map(teams.map(t => [String(t.team_id).trim(), t]));
+  const teamById = new Map(teams.map(t => [String(t.team_id ?? "").trim(), t]));
 
-  // match_id -> schedule row
-  const schedByMatch = new Map();
-  for (const s of schedule){
-    if (!s.match_id) continue;
-    schedByMatch.set(String(s.match_id).trim(), s);
+  // match_id -> game row
+  const gameByMatch = new Map();
+  for (const g of games) {
+    const mid = String(g.match_id ?? "").trim();
+    if (mid) gameByMatch.set(mid, g);
   }
 
-// Series scheduling: Mxx -> max G# scheduled (based on schedule.csv)
-const maxGamesBySeries = new Map();
-for (const s of schedule) {
-  if (!s.match_id) continue;
-  if (!isPlayoffStage(s.stage)) continue;
-
-  const mid = String(s.match_id).trim();
-  const sid = seriesIdFromMatchId(mid);
-  const gno = gameNumFromMatchId(mid);
-
-  if (!sid || !gno) continue;
-  maxGamesBySeries.set(sid, Math.max(maxGamesBySeries.get(sid) ?? 0, gno));
-}
-
-const pg = games
-  .map(g => {
-    const mid = String(g.match_id ?? "").trim();
-    const s = schedByMatch.get(mid);
-    return { g, s };
-  })
-  .filter(x => x.s && isPlayoffStage(x.s.stage));
-
-  // seriesKey -> series object
+  // Build series directly from SCHEDULE, not games
+  // This lets the bracket appear even before any games are played/imported.
   const series = new Map();
 
-  for (const { g, s } of pg){
-    const home = String(g.home_team_id ?? "").trim();
-    const away = String(g.away_team_id ?? "").trim();
-    const st   = String(s.stage ?? "").trim().toLowerCase();
+  for (const s of schedule) {
+    const mid = String(s.match_id ?? "").trim();
+    const st = String(s.stage ?? "").trim().toLowerCase();
+    if (!mid || !isPlayoffStage(st)) continue;
 
+    const home = String(s.home_team_id ?? "").trim();
+    const away = String(s.away_team_id ?? "").trim();
     if (!home || !away) continue;
 
-    // stable key regardless of home/away
-    const a = home < away ? home : away;
-    const b = home < away ? away : home;
-    const key = `${st}|${a}|${b}`;
+    const sid = seriesIdFromMatchId(mid);
+    if (!sid) continue;
 
-if (!series.has(key)){
-  series.set(key, {
-    stage: st,
-    sid: seriesIdFromMatchId(s.match_id),
-    a, b,
-    games: [],
-  });
-}
+    const key = `${st}|${sid}`;
 
-    series.get(key).games.push({ g, s });
+    if (!series.has(key)) {
+      series.set(key, {
+        stage: st,
+        sid,
+        home,
+        away,
+        items: [], // scheduled games in this series
+      });
+    }
+
+    series.get(key).items.push({
+      s,
+      g: gameByMatch.get(mid) ?? null,
+      gnum: gameNumFromMatchId(mid),
+      match_id: mid,
+    });
   }
-// --- Determine Finals champion (if finals series is complete) ---
-let finalsChampionId = null;
-let finalsChampionRow = null;
 
-for (const srs of series.values()) {
-  if (srs.stage !== "f") continue;
+  // Sort games inside each series by G1/G2/G3...
+  for (const srs of series.values()) {
+    srs.items.sort((a, b) => (a.gnum ?? 0) - (b.gnum ?? 0));
+  }
 
-  const completed = srs.games.filter(x =>
-    toIntMaybe(x.g.home_goals) !== null && toIntMaybe(x.g.away_goals) !== null
-  );
+  // Determine Finals champion only if finals series is fully completed
+  let finalsChampionId = null;
+  let finalsChampionRow = null;
 
-  const scheduledN = maxGamesBySeries.get(srs.sid) ?? 0;
-  const seriesFinal = (scheduledN > 0 && completed.length >= scheduledN);
-  if (!seriesFinal || !completed.length) continue;
+  for (const srs of series.values()) {
+    if (srs.stage !== "f") continue;
 
-  const last = completed[completed.length - 1];
-  const home = String(last.g.home_team_id ?? "").trim();
-  const away = String(last.g.away_team_id ?? "").trim();
-  const hs = toIntMaybe(last.g.home_goals);
-  const as = toIntMaybe(last.g.away_goals);
-  if (hs === null || as === null) continue;
+    const completed = srs.items.filter(x =>
+      x.g &&
+      toIntMaybe(x.g.home_goals) !== null &&
+      toIntMaybe(x.g.away_goals) !== null
+    );
 
-  finalsChampionId = (hs > as) ? home : away;
-  finalsChampionRow = teamById.get(finalsChampionId) || null;
+    const scheduledN = srs.items.length;
+    const seriesFinal = (scheduledN > 0 && completed.length >= scheduledN);
+    if (!seriesFinal || !completed.length) continue;
 
-  break; // only one finals series expected
-}
+    let aWins = 0;
+    let bWins = 0;
 
-  // build columns QF/SF/F
+    for (const x of completed) {
+      const hg = toIntMaybe(x.g.home_goals);
+      const ag = toIntMaybe(x.g.away_goals);
+      if (hg === null || ag === null) continue;
+
+      const winner = hg > ag
+        ? String(x.g.home_team_id ?? "").trim()
+        : String(x.g.away_team_id ?? "").trim();
+
+      if (winner === srs.home) aWins++;
+      else if (winner === srs.away) bWins++;
+    }
+
+    finalsChampionId = (aWins >= bWins) ? srs.home : srs.away;
+    finalsChampionRow = teamById.get(finalsChampionId) || null;
+    break;
+  }
+
   const rounds = [
     { st: "qf", title: "Quarter Finals (Bo3)" },
-    { st: "sf", title: "Semi FInals (Bo5)" },
+    { st: "sf", title: "Semi Finals (Bo5)" },
     { st: "f",  title: "Finals (Bo5)" },
   ];
 
   elHomePlayoffsWrap.innerHTML = "";
 
-  for (const r of rounds){
+  for (const r of rounds) {
     const col = document.createElement("div");
+
     const title = document.createElement("div");
     title.className = "playoffs-col-title";
     title.textContent = r.title;
     col.appendChild(title);
 
-    const list = [...series.values()]
-      .filter(x => x.stage === r.st);
+    const list = [...series.values()].filter(x => x.stage === r.st);
 
-    if (!list.length){
+    if (!list.length) {
       const empty = document.createElement("div");
       empty.className = "status";
       empty.textContent = "No matchups.";
@@ -1399,129 +1401,187 @@ for (const srs of series.values()) {
       continue;
     }
 
-    // Sort by whatever schedule order you already use: date/when/imported_on if present
-    list.sort((x, y) => (x.a + x.b).localeCompare(y.a + y.b));
+    // Stable series ordering
+    list.sort((x, y) => String(x.sid).localeCompare(String(y.sid), undefined, { numeric: true }));
 
     for (const srs of list) {
-  // completed games = has both scores
-  const completed = srs.games.filter(x =>
-    toIntMaybe(x.g.home_goals) !== null && toIntMaybe(x.g.away_goals) !== null
-  );
+      const completed = srs.items.filter(x =>
+        x.g &&
+        toIntMaybe(x.g.home_goals) !== null &&
+        toIntMaybe(x.g.away_goals) !== null
+      );
 
-  // wins in series based on completed games
-  let aw = 0, bw = 0;
-  
-    const scheduledN = maxGamesBySeries.get(srs.sid) ?? 0;
-  const completedN = completed.length;
+      const scheduledN = srs.items.length;
+      const completedN = completed.length;
+      const seriesFinal = (scheduledN > 0 && completedN >= scheduledN);
 
-  // series is complete only if we've got all scheduled games completed
-  const seriesFinal = (scheduledN > 0 && completedN >= scheduledN);
+      const statusText = seriesFinal
+        ? "Final"
+        : (completedN ? "In progress" : "Scheduled");
 
-  // status label
-  const statusText = seriesFinal
-    ? "Final"
-    : (completedN ? "In progress" : "Scheduled");
+      let homeWins = 0;
+      let awayWins = 0;
 
-  for (const x of completed) {
-    const home = String(x.g.home_team_id ?? "").trim();
-    const away = String(x.g.away_team_id ?? "").trim();
-    const hs = toIntMaybe(x.g.home_goals);
-    const as = toIntMaybe(x.g.away_goals);
-    if (hs === null || as === null) continue;
+      for (const x of completed) {
+        const hg = toIntMaybe(x.g.home_goals);
+        const ag = toIntMaybe(x.g.away_goals);
+        if (hg === null || ag === null) continue;
 
-    const winId = (hs > as) ? home : away;
-    if (winId === srs.a) aw++;
-    else if (winId === srs.b) bw++;
-  }
+        const winner = hg > ag
+          ? String(x.g.home_team_id ?? "").trim()
+          : String(x.g.away_team_id ?? "").trim();
 
-  // determine "last completed game" winner
-  const last = completed.length ? completed[completed.length - 1] : null;
-  const winner = last ? (() => {
-    const home = String(last.g.home_team_id ?? "").trim();
-    const away = String(last.g.away_team_id ?? "").trim();
-    const hs = toIntMaybe(last.g.home_goals);
-    const as = toIntMaybe(last.g.away_goals);
-    if (hs === null || as === null) return null;
-    return (hs > as) ? home : away;
-  })() : null;
+        if (winner === srs.home) homeWins++;
+        else if (winner === srs.away) awayWins++;
+      }
 
-  const aTeam = teamById.get(srs.a);
-  const bTeam = teamById.get(srs.b);
+      const homeTeam = teamById.get(srs.home) || null;
+      const awayTeam = teamById.get(srs.away) || null;
 
-  const aName = String(aTeam?.team_name ?? srs.a);
-  const bName = String(bTeam?.team_name ?? srs.b);
+      const homeName = String(homeTeam?.team_name ?? srs.home);
+      const awayName = String(awayTeam?.team_name ?? srs.away);
 
-  const card = document.createElement("div");
-  card.className = "series-card";
+const card = document.createElement("div");
+card.className = "series-card";
 
-  const top = document.createElement("div");
-  top.className = "series-top";
-  top.innerHTML = `<span>${stageLabel(r.st)}</span><span>${statusText}</span>`;
-  card.appendChild(top);
+const game1MatchId = srs.items.find(x => (x.gnum ?? 0) === 1)?.match_id || srs.items[0]?.match_id || "";
 
-  const teamsBox = document.createElement("div");
-  teamsBox.className = "series-teams";
-  
-  const rowA = document.createElement("div");
-rowA.className = "series-row";
+const top = document.createElement("div");
+top.className = "series-top";
+top.innerHTML = `<span>${stageLabel(r.st)}</span><span>${statusText}</span>`;
 
-const rowB = document.createElement("div");
-rowB.className = "series-row";
+// Click header/top area -> Game 1 boxscore preview
+if (game1MatchId) {
+  top.tabIndex = 0;
+  top.setAttribute("role", "link");
+  top.style.cursor = "pointer";
 
-const aLogo = teamLogoUrl(seasonId, srs.a); // uses same helper as schedule
-const bLogo = teamLogoUrl(seasonId, srs.b);
+  const href = boxscoreHref(seasonId, game1MatchId);
 
+  top.addEventListener("click", () => {
+    window.location.href = href;
+  });
 
-rowA.innerHTML = `
-  <span class="series-left">
-    <img class="pill-logo" src="${aLogo}" alt="">
-    <span class="name">${aName}</span>
-  </span>
-  <span class="wins">${aw}</span>
-`;
-
-rowB.innerHTML = `
-  <span class="series-left">
-    <img class="pill-logo" src="${bLogo}" alt="">
-    <span class="name">${bName}</span>
-  </span>
-  <span class="wins">${bw}</span>
-`;
-
-// Accent colors via CSS variables (prettier than full-fill)
-if (aTeam?.bg_color) rowA.style.setProperty("--team-bg", String(aTeam.bg_color).trim());
-if (aTeam?.text_color) rowA.style.setProperty("--team-fg", String(aTeam.text_color).trim());
-
-if (bTeam?.bg_color) rowB.style.setProperty("--team-bg", String(bTeam.bg_color).trim());
-if (bTeam?.text_color) rowB.style.setProperty("--team-fg", String(bTeam.text_color).trim());
-
-// Winner/loser styling (only when series is Final)
-rowA.classList.remove("is-winner","is-loser");
-rowB.classList.remove("is-winner","is-loser");
-
-if (seriesFinal && winner) {
-  if (winner === srs.a) {
-    rowA.classList.add("is-winner");
-    rowB.classList.add("is-loser");
-  } else if (winner === srs.b) {
-    rowB.classList.add("is-winner");
-    rowA.classList.add("is-loser");
-  }
+  top.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      window.location.href = href;
+    }
+  });
 }
 
-  teamsBox.appendChild(rowA);
-  teamsBox.appendChild(rowB);
-  card.appendChild(teamsBox);
+card.appendChild(top);
 
-  col.appendChild(card);
+const teamsBox = document.createElement("div");
+teamsBox.className = "series-teams";
+
+const rowHome = document.createElement("div");
+rowHome.className = "series-row";
+
+const rowAway = document.createElement("div");
+rowAway.className = "series-row";
+
+      const homeLogoHtml = homeTeam
+        ? `<img class="pill-logo" src="${teamLogoUrl(seasonId, srs.home)}" alt="">`
+        : `<span class="pill-logo" aria-hidden="true"></span>`;
+
+      const awayLogoHtml = awayTeam
+        ? `<img class="pill-logo" src="${teamLogoUrl(seasonId, srs.away)}" alt="">`
+        : `<span class="pill-logo" aria-hidden="true"></span>`;
+
+      rowHome.innerHTML = `
+        <span class="series-left">
+          ${homeLogoHtml}
+          <span class="name">${homeName}</span>
+        </span>
+        <span class="wins">${homeWins}</span>
+      `;
+
+      rowAway.innerHTML = `
+        <span class="series-left">
+          ${awayLogoHtml}
+          <span class="name">${awayName}</span>
+        </span>
+        <span class="wins">${awayWins}</span>
+      `;
+	  
+	  const homeIsRealTeam = !!homeTeam;
+const awayIsRealTeam = !!awayTeam;
+
+if (homeIsRealTeam) {
+  const homeHref = `pages/team.html?season=${encodeURIComponent(seasonId)}&team_id=${encodeURIComponent(srs.home)}`;
+  rowHome.tabIndex = 0;
+  rowHome.setAttribute("role", "link");
+  rowHome.style.cursor = "pointer";
+
+  rowHome.addEventListener("click", (e) => {
+    e.stopPropagation();
+    window.location.href = homeHref;
+  });
+
+  rowHome.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      e.stopPropagation();
+      window.location.href = homeHref;
+    }
+  });
 }
-// If this is Finals column and we have a champion, add the champion card
-if (r.st === "f" && finalsChampionId) {
-  col.appendChild(buildChampionCard(seasonId, finalsChampionId, finalsChampionRow));
+
+if (awayIsRealTeam) {
+  const awayHref = `pages/team.html?season=${encodeURIComponent(seasonId)}&team_id=${encodeURIComponent(srs.away)}`;
+  rowAway.tabIndex = 0;
+  rowAway.setAttribute("role", "link");
+  rowAway.style.cursor = "pointer";
+
+  rowAway.addEventListener("click", (e) => {
+    e.stopPropagation();
+    window.location.href = awayHref;
+  });
+
+  rowAway.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      e.stopPropagation();
+      window.location.href = awayHref;
+    }
+  });
 }
+
+      if (homeTeam?.bg_color) rowHome.style.setProperty("--team-bg", String(homeTeam.bg_color).trim());
+      if (homeTeam?.text_color) rowHome.style.setProperty("--team-fg", String(homeTeam.text_color).trim());
+
+      if (awayTeam?.bg_color) rowAway.style.setProperty("--team-bg", String(awayTeam.bg_color).trim());
+      if (awayTeam?.text_color) rowAway.style.setProperty("--team-fg", String(awayTeam.text_color).trim());
+
+      rowHome.classList.remove("is-winner", "is-loser");
+      rowAway.classList.remove("is-winner", "is-loser");
+
+      if (seriesFinal) {
+        if (homeWins > awayWins) {
+          rowHome.classList.add("is-winner");
+          rowAway.classList.add("is-loser");
+        } else if (awayWins > homeWins) {
+          rowAway.classList.add("is-winner");
+          rowHome.classList.add("is-loser");
+        }
+      }
+
+      teamsBox.appendChild(rowHome);
+      teamsBox.appendChild(rowAway);
+      card.appendChild(teamsBox);
+
+      col.appendChild(card);
+    }
+
+    if (r.st === "f" && finalsChampionId) {
+      col.appendChild(buildChampionCard(seasonId, finalsChampionId, finalsChampionRow));
+    }
+
     elHomePlayoffsWrap.appendChild(col);
   }
 }
+
 function seriesIdFromMatchId(matchId) {
   return String(matchId ?? "").split("-")[0]; // "M35-G5" -> "M35"
 }
