@@ -93,49 +93,111 @@ function computeRoleSplitFromBoxscores(boxRows, pSeason) {
   const playerNameNorm = normalizeName(pSeason.name);
 
   function isMe(r) {
-    const rSteam = String(r.steam_id ?? "").trim();
+    const rSteam = String(r.steam_id ?? r.steamid ?? r.steamID ?? r.steam ?? r.steam64 ?? "").trim();
     if (playerSteam && rSteam && rSteam === playerSteam) return true;
     return normalizeName(r.player_name) === playerNameNorm;
   }
 
+  function addNum(bucket, key, val) {
+    bucket[key] = (bucket[key] ?? 0) + (toNumMaybe(val) ?? 0);
+  }
+
   const out = {
-    skater: { g: 0, a: 0, pts: 0, passes: 0 },
-    goalie: { g: 0, a: 0, pts: 0, passes: 0 },
+    skater: {
+      g: 0, a: 0, pts: 0,
+      shots: 0,
+      passes: 0,
+      offensive_passes: 0,
+      defensive_passes: 0,
+      entries: 0,
+      exits: 0,
+      takeaways: 0,
+      offensive_takeaways: 0,
+      defensive_takeaways: 0,
+      turnovers: 0,
+      offensive_turnovers: 0,
+      defensive_turnovers: 0,
+      hits: 0,
+      blocks: 0,
+      xG: 0,
+      sp: 0,
+      possession: 0,
+      toi: 0
+    },
+    goalie: {
+      g: 0, a: 0, pts: 0,
+      passes: 0,
+      sa: 0,
+      ga: 0,
+      xGA: 0,
+      body_sv: 0,
+      stick_sv: 0,
+      wins: 0,
+      so: 0,
+      sp: 0,
+      toi: 0
+    },
   };
 
   for (const r of (boxRows || [])) {
     if (!isMe(r)) continue;
 
-    const isG = String(r.position ?? "").trim().toUpperCase() === "G";
+    const isG = isGoalieBoxRow(r);
     const bucket = isG ? out.goalie : out.skater;
 
-    const g = toIntMaybe(r.g) ?? 0;
-    const a = toIntMaybe(r.a) ?? 0;
-    const passes = toIntMaybe(r.passes) ?? 0;
+    addNum(bucket, "g", r.g);
+    addNum(bucket, "a", r.a);
+    bucket.pts += (toNumMaybe(r.g) ?? 0) + (toNumMaybe(r.a) ?? 0);
+    addNum(bucket, "passes", r.passes);
+    addNum(bucket, "sp", r.sp);
 
-    bucket.g += g;
-    bucket.a += a;
-    bucket.pts += (g + a);   // boxscores has g/a, so pts = g+a
-    bucket.passes += passes;
+    if (isG) {
+      addNum(bucket, "sa", r.sa);
+      addNum(bucket, "ga", r.ga);
+      addNum(bucket, "xGA", r.xGA ?? r.xga);
+      addNum(bucket, "body_sv", r.body_sv);
+      addNum(bucket, "stick_sv", r.stick_sv);
+      addNum(bucket, "wins", r.w ?? r.wins);
+      addNum(bucket, "so", r.so);
+      addNum(bucket, "toi", r.toi_g ?? r.toi_s ?? r.toi);
+    } else {
+      addNum(bucket, "shots", r.shots);
+      addNum(bucket, "offensive_passes", r.offensive_passes);
+      addNum(bucket, "defensive_passes", r.defensive_passes);
+      addNum(bucket, "entries", r.entries);
+      addNum(bucket, "exits", r.exits);
+      addNum(bucket, "takeaways", r.takeaways);
+      addNum(bucket, "offensive_takeaways", r.offensive_takeaways);
+      addNum(bucket, "defensive_takeaways", r.defensive_takeaways);
+      addNum(bucket, "turnovers", r.turnovers);
+      addNum(bucket, "offensive_turnovers", r.offensive_turnovers);
+      addNum(bucket, "defensive_turnovers", r.defensive_turnovers);
+      addNum(bucket, "hits", r.hits);
+      addNum(bucket, "blocks", r.blocks);
+      addNum(bucket, "xG", r.xG ?? r.xg);
+
+      const possKey = pickFirstExisting(r, ["possession", "poss", "possessions", "pos_time", "possession_s", "poss_s"]);
+      if (possKey) addNum(bucket, "possession", r[possKey]);
+
+      addNum(bucket, "toi", r.toi_s ?? r.toi);
+    }
   }
 
   return out;
 }
 
 function mergeRoleSplitTotals(a, b) {
+  function mergeBucket(x = {}, y = {}) {
+    const out = { ...x };
+    for (const [k, v] of Object.entries(y)) {
+      out[k] = (out[k] ?? 0) + (toNumMaybe(v) ?? 0);
+    }
+    return out;
+  }
+
   return {
-    skater: {
-      g: (a?.skater?.g ?? 0) + (b?.skater?.g ?? 0),
-      a: (a?.skater?.a ?? 0) + (b?.skater?.a ?? 0),
-      pts: (a?.skater?.pts ?? 0) + (b?.skater?.pts ?? 0),
-      passes: (a?.skater?.passes ?? 0) + (b?.skater?.passes ?? 0),
-    },
-    goalie: {
-      g: (a?.goalie?.g ?? 0) + (b?.goalie?.g ?? 0),
-      a: (a?.goalie?.a ?? 0) + (b?.goalie?.a ?? 0),
-      pts: (a?.goalie?.pts ?? 0) + (b?.goalie?.pts ?? 0),
-      passes: (a?.goalie?.passes ?? 0) + (b?.goalie?.passes ?? 0),
-    },
+    skater: mergeBucket(a?.skater, b?.skater),
+    goalie: mergeBucket(a?.goalie, b?.goalie),
   };
 }
 
@@ -545,22 +607,19 @@ const s_g   = (roleSplitSeason ? roleSplitSeason.skater.g : (toIntMaybe(pSeason.
 const s_a   = (roleSplitSeason ? roleSplitSeason.skater.a : (toIntMaybe(pSeason.a) ?? 0));
 const s_pts = (roleSplitSeason ? roleSplitSeason.skater.pts : (toIntMaybe(pSeason.pts) ?? 0));
 
-  const s_shots = parseShots(pSeason.shots);
+  const s_shots = roleSplitSeason ? toNumMaybe(roleSplitSeason.skater.shots) : parseShots(pSeason.shots);
   const s_shp = (s_shots != null && s_shots > 0) ? (s_g / s_shots) * 100 : null;
 
   const s_passes = (roleSplitSeason ? roleSplitSeason.skater.passes : toIntMaybe(pSeason.passes));
-  const s_entries = toIntMaybe(pSeason.entries);
-  const s_exits   = toIntMaybe(pSeason.exits);
-
-  const s_ta   = toIntMaybe(pSeason.takeaways);
-  const s_to   = toIntMaybe(pSeason.turnovers);
-  const s_hits = toIntMaybe(pSeason.hits);
-  const s_blocks = toIntMaybe(pSeason.blocks);
-
-  const s_xg = toNumMaybe(pSeason.xG);
+  const s_entries = roleSplitSeason ? toNumMaybe(roleSplitSeason.skater.entries) : toIntMaybe(pSeason.entries);
+  const s_exits   = roleSplitSeason ? toNumMaybe(roleSplitSeason.skater.exits) : toIntMaybe(pSeason.exits);
+  const s_ta      = roleSplitSeason ? toNumMaybe(roleSplitSeason.skater.takeaways) : toIntMaybe(pSeason.takeaways);
+  const s_to      = roleSplitSeason ? toNumMaybe(roleSplitSeason.skater.turnovers) : toIntMaybe(pSeason.turnovers);
+  const s_hits    = roleSplitSeason ? toNumMaybe(roleSplitSeason.skater.hits) : toIntMaybe(pSeason.hits);
+  const s_blocks  = roleSplitSeason ? toNumMaybe(roleSplitSeason.skater.blocks) : toIntMaybe(pSeason.blocks);
+  const s_xg      = roleSplitSeason ? toNumMaybe(roleSplitSeason.skater.xG) : toNumMaybe(pSeason.xG);
   const s_gfax = (s_xg != null) ? (s_g - s_xg) : null;
-
-  const s_sp = toNumMaybe(pSeason.sp);
+  const s_sp      = roleSplitSeason ? toNumMaybe(roleSplitSeason.skater.sp) : toNumMaybe(pSeason.sp);
 
   /* ---------------- Skater (Career) ---------------- */
   const c_gp   = career.gp_s ?? 0;
@@ -593,20 +652,29 @@ const s_pts = (roleSplitSeason ? roleSplitSeason.skater.pts : (toIntMaybe(pSeaso
   const c_toi_s = career.toi_s ?? 0;
 
   // Display values (season uses perGpNormalized; career uses TOI sums)
-  const sG      = isPer15 ? perGpNormalized(s_g,      pSeason, "SKATER", advOn) : s_g;
-  const sA      = isPer15 ? perGpNormalized(s_a,      pSeason, "SKATER", advOn) : s_a;
-  const sPTS    = isPer15 ? perGpNormalized(s_pts,    pSeason, "SKATER", advOn) : s_pts;
-  const sShots  = isPer15 ? perGpNormalized(s_shots,  pSeason, "SKATER", advOn) : s_shots;
-  const sPasses = isPer15 ? perGpNormalized(s_passes, pSeason, "SKATER", advOn) : s_passes;
-  const sTA     = isPer15 ? perGpNormalized(s_ta,     pSeason, "SKATER", advOn) : s_ta;
-  const sTO     = isPer15 ? perGpNormalized(s_to,     pSeason, "SKATER", advOn) : s_to;
-  const sEnt    = isPer15 ? perGpNormalized(s_entries,pSeason, "SKATER", advOn) : s_entries;
-  const sEx     = isPer15 ? perGpNormalized(s_exits,  pSeason, "SKATER", advOn) : s_exits;
-  const sHit    = isPer15 ? perGpNormalized(s_hits,   pSeason, "SKATER", advOn) : s_hits;
-  const sBlk    = isPer15 ? perGpNormalized(s_blocks, pSeason, "SKATER", advOn) : s_blocks;
-  const sXG     = isPer15 ? perGpNormalized(s_xg,     pSeason, "SKATER", advOn) : s_xg;
-  const sGFAx   = isPer15 ? perGpNormalized(s_gfax,   pSeason, "SKATER", advOn) : s_gfax;
-  const sSP     = isPer15 ? perGpNormalized(s_sp,     pSeason, "SKATER", advOn) : s_sp;
+    const skToiSeason = roleSplitSeason ? toNumMaybe(roleSplitSeason.skater.toi) : toNumMaybe(pSeason.toi_s ?? pSeason.toi);
+  const gkToiSeason = roleSplitSeason ? toNumMaybe(roleSplitSeason.goalie.toi) : toNumMaybe(pSeason.toi_g ?? pSeason.toi);
+
+  function per15WithToi(total, toi) {
+    const t = toNumMaybe(total);
+    if (t == null || toi == null || toi <= 0) return null;
+    return t * 900 / toi;
+  }
+
+  const sG      = isPer15 ? per15WithToi(s_g, skToiSeason) : s_g;
+  const sA      = isPer15 ? per15WithToi(s_a, skToiSeason) : s_a;
+  const sPTS    = isPer15 ? per15WithToi(s_pts, skToiSeason) : s_pts;
+  const sShots  = isPer15 ? per15WithToi(s_shots, skToiSeason) : s_shots;
+  const sPasses = isPer15 ? per15WithToi(s_passes, skToiSeason) : s_passes;
+  const sTA     = isPer15 ? per15WithToi(s_ta, skToiSeason) : s_ta;
+  const sTO     = isPer15 ? per15WithToi(s_to, skToiSeason) : s_to;
+  const sEnt    = isPer15 ? per15WithToi(s_entries, skToiSeason) : s_entries;
+  const sEx     = isPer15 ? per15WithToi(s_exits, skToiSeason) : s_exits;
+  const sHit    = isPer15 ? per15WithToi(s_hits, skToiSeason) : s_hits;
+  const sBlk    = isPer15 ? per15WithToi(s_blocks, skToiSeason) : s_blocks;
+  const sXG     = isPer15 ? per15WithToi(s_xg, skToiSeason) : s_xg;
+  const sGFAx   = isPer15 ? per15WithToi(s_gfax, skToiSeason) : s_gfax;
+  const sSP     = isPer15 ? per15WithToi(s_sp, skToiSeason) : s_sp;
 
   const cG      = per15FromCareer(c_g,      c_toi_s);
   const cA      = per15FromCareer(c_a,      c_toi_s);
@@ -648,8 +716,8 @@ const s_pts = (roleSplitSeason ? roleSplitSeason.skater.pts : (toIntMaybe(pSeaso
 
   /* ---------------- Goalie (Season) ---------------- */
   const g_gp = toIntMaybe(pSeason.gp_g) ?? 0;
-  const g_sa = toIntMaybe(pSeason.sa);
-  const g_ga = toIntMaybe(pSeason.ga);
+  const g_sa = roleSplitSeason ? toNumMaybe(roleSplitSeason.goalie.sa) : toIntMaybe(pSeason.sa);
+  const g_ga = roleSplitSeason ? toNumMaybe(roleSplitSeason.goalie.ga) : toIntMaybe(pSeason.ga);
 
   // Totals-derived SV (for totals view)
   const g_sv_tot = (g_sa != null && g_ga != null) ? (g_sa - g_ga) : null;
@@ -662,19 +730,19 @@ const s_pts = (roleSplitSeason ? roleSplitSeason.skater.pts : (toIntMaybe(pSeaso
 
   const g_gaaCsv = toNumMaybe(pSeason.gaa);
   const g_gaa = (g_gaaCsv != null && Number.isFinite(g_gaaCsv))
-    ? g_gaaCsv
-    : perGpNormalized(g_ga, pSeason, "GOALIE", advOn); // fallback if missing
+  ? g_gaaCsv
+  : per15WithToi(g_ga, gkToiSeason);
 
-  const g_w  = toIntMaybe(pSeason.wins);
-  const g_so = toIntMaybe(pSeason.so);
+  const g_w  = roleSplitSeason ? toNumMaybe(roleSplitSeason.goalie.wins) : toIntMaybe(pSeason.wins);
+  const g_so = roleSplitSeason ? toNumMaybe(roleSplitSeason.goalie.so) : toIntMaybe(pSeason.so);
 
   const g_pts = (roleSplitSeason ? roleSplitSeason.goalie.pts : toIntMaybe(pSeason.pts));
 const g_passes = (roleSplitSeason ? roleSplitSeason.goalie.passes : toIntMaybe(pSeason.passes));
 
-  const g_xga = toNumMaybe(pSeason.xGA);
+  const g_xga = roleSplitSeason ? toNumMaybe(roleSplitSeason.goalie.xGA) : toNumMaybe(pSeason.xGA);
   const g_gsax = (g_xga != null && g_ga != null) ? (g_xga - g_ga) : null;
 
-  const g_sp = toNumMaybe(pSeason.sp);
+  const g_sp = roleSplitSeason ? toNumMaybe(roleSplitSeason.goalie.sp) : toNumMaybe(pSeason.sp);
 
   /* ---------------- Goalie (Career) ---------------- */
   const cg_gp = career.gp_g ?? 0;
@@ -702,20 +770,21 @@ const g_passes = (roleSplitSeason ? roleSplitSeason.goalie.passes : toIntMaybe(p
   const cg_sp = career.sp ?? 0;
 
   // Display values (toggle-able counting stats)
-  const gSA = isPer15 ? perGpNormalized(g_sa, pSeason, "GOALIE", advOn) : g_sa;
-  const gGA = isPer15 ? perGpNormalized(g_ga, pSeason, "GOALIE", advOn) : g_ga;
+    // Display values (toggle-able counting stats)
+  const gSA = isPer15 ? per15WithToi(g_sa, gkToiSeason) : g_sa;
+  const gGA = isPer15 ? per15WithToi(g_ga, gkToiSeason) : g_ga;
   const gSV = (gSA != null && gGA != null) ? (gSA - gGA) : null;
 
-  const gW  = isPer15 ? perGpNormalized(g_w,  pSeason, "GOALIE", advOn) : g_w;
-  const gSO = isPer15 ? perGpNormalized(g_so, pSeason, "GOALIE", advOn) : g_so;
+  const gW  = isPer15 ? per15WithToi(g_w, gkToiSeason) : g_w;
+  const gSO = isPer15 ? per15WithToi(g_so, gkToiSeason) : g_so;
 
-  const gPTS = isPer15 ? perGpNormalized(g_pts, pSeason, "GOALIE", advOn) : g_pts;
-  const gPass = isPer15 ? perGpNormalized(g_passes, pSeason, "GOALIE", advOn) : g_passes;
+  const gPTS = isPer15 ? per15WithToi(g_pts, gkToiSeason) : g_pts;
+  const gPass = isPer15 ? per15WithToi(g_passes, gkToiSeason) : g_passes;
 
-  const gXGA  = isPer15 ? perGpNormalized(g_xga,  pSeason, "GOALIE", advOn) : g_xga;
-  const gGSAX = isPer15 ? perGpNormalized(g_gsax, pSeason, "GOALIE", advOn) : g_gsax;
+  const gXGA  = isPer15 ? per15WithToi(g_xga, gkToiSeason) : g_xga;
+  const gGSAX = isPer15 ? per15WithToi(g_gsax, gkToiSeason) : g_gsax;
 
-  const gSP  = isPer15 ? perGpNormalized(g_sp, pSeason, "GOALIE", advOn) : g_sp;
+  const gSP  = isPer15 ? per15WithToi(g_sp, gkToiSeason) : g_sp;
 
   const cgSA = per15FromCareer(cg_sa, c_toi_g);
   const cgGA = per15FromCareer(cg_ga, c_toi_g);
@@ -920,7 +989,7 @@ const SIGNED_KEYS_PLAYERBARS = new Set([
 
 const PLAYER_BARS_DELTA_CAP = 300;   // max absolute % contribution for normal stats
 const PLAYER_BARS_SIGNED_SCALE = 100; // signed diff stats like GFAx/GSAx use raw diff * this
-const PLAYER_BARS_WEIGHT_VISUAL_STRENGTH = 0; // 0 = no visual weight scaling, 1 = strongest
+const PLAYER_BARS_WEIGHT_VISUAL_STRENGTH = 0.5; // 0 = no visual weight scaling, 1 = strongest
 
 const PLAYER_BARS_CONFIG = {
   skater: [
@@ -1700,8 +1769,8 @@ function computeLeagueAveragesFromBoxscores(rows) {
   const g = { sa: 0, ga: 0, xga: 0, passes: 0 };
 
   function isGoalieRow(r) {
-    return String(r.position ?? "").trim().toUpperCase() === "G";
-  }
+  return isGoalieBoxRow(r);
+}
 
   for (const r of (rows || [])) {
     const isG = isGoalieRow(r);
@@ -1800,7 +1869,7 @@ function computeLeagueAveragesFromBoxscores(rows) {
   return { skater, goalie, possKey };
 }
 
-function computeLeagueMinsFromPlayers(playersRows, role, advOn) {
+function computeLeagueMinsFromPlayers(playersRows, role, advOn, boxRows = []) {
   const mins = {};
 
   for (const p of (playersRows || [])) {
@@ -1808,32 +1877,25 @@ function computeLeagueMinsFromPlayers(playersRows, role, advOn) {
 
     const gpS = Number(p.gp_s ?? 0);
     const gpG = Number(p.gp_g ?? 0);
+    const isFlex = gpS > 0 && gpG > 0;
 
-    if (role === "SKATER" && gpS > 0) {
-      const vals = readPlayerPer15FromSeasonRow(p, advOn)?.skater;
-      if (!vals) continue;
+    const split = isFlex ? computeRoleSplitFromBoxscores(boxRows, p) : null;
+    const allVals = readPlayerPer15FromSeasonRow(p, advOn, split);
+    if (!allVals) continue;
 
-      for (const [k, v] of Object.entries(vals)) {
-        if (!Number.isFinite(v)) continue;
-        mins[k] = (mins[k] == null) ? v : Math.min(mins[k], v);
-      }
-    }
+    const vals = role === "GOALIE" ? allVals.goalie : allVals.skater;
+    if (!vals) continue;
 
-    if (role === "GOALIE" && gpG > 0) {
-      const vals = readPlayerPer15FromSeasonRow(p, advOn)?.goalie;
-      if (!vals) continue;
-
-      for (const [k, v] of Object.entries(vals)) {
-        if (!Number.isFinite(v)) continue;
-        mins[k] = (mins[k] == null) ? v : Math.min(mins[k], v);
-      }
+    for (const [k, v] of Object.entries(vals)) {
+      if (!Number.isFinite(v)) continue;
+      mins[k] = (mins[k] == null) ? v : Math.min(mins[k], v);
     }
   }
 
   return mins;
 }
 
-function computeLeagueMaxesFromPlayers(playersRows, role, advOn) {
+function computeLeagueMaxesFromPlayers(playersRows, role, advOn, boxRows = []) {
   const maxes = {};
 
   for (const p of (playersRows || [])) {
@@ -1841,25 +1903,18 @@ function computeLeagueMaxesFromPlayers(playersRows, role, advOn) {
 
     const gpS = Number(p.gp_s ?? 0);
     const gpG = Number(p.gp_g ?? 0);
+    const isFlex = gpS > 0 && gpG > 0;
 
-    if (role === "SKATER" && gpS > 0) {
-      const vals = readPlayerPer15FromSeasonRow(p, advOn)?.skater;
-      if (!vals) continue;
+    const split = isFlex ? computeRoleSplitFromBoxscores(boxRows, p) : null;
+    const allVals = readPlayerPer15FromSeasonRow(p, advOn, split);
+    if (!allVals) continue;
 
-      for (const [k, v] of Object.entries(vals)) {
-        if (!Number.isFinite(v)) continue;
-        maxes[k] = Math.max(maxes[k] ?? 0, v);
-      }
-    }
+    const vals = role === "GOALIE" ? allVals.goalie : allVals.skater;
+    if (!vals) continue;
 
-    if (role === "GOALIE" && gpG > 0) {
-      const vals = readPlayerPer15FromSeasonRow(p, advOn)?.goalie;
-      if (!vals) continue;
-
-      for (const [k, v] of Object.entries(vals)) {
-        if (!Number.isFinite(v)) continue;
-        maxes[k] = Math.max(maxes[k] ?? 0, v);
-      }
+    for (const [k, v] of Object.entries(vals)) {
+      if (!Number.isFinite(v)) continue;
+      maxes[k] = Math.max(maxes[k] ?? 0, v);
     }
   }
 
@@ -1869,80 +1924,109 @@ function computeLeagueMaxesFromPlayers(playersRows, role, advOn) {
 function readPlayerPer15FromSeasonRow(pSeason, advOn, roleSplitSeason) {
   if (!advOn) return null;
 
-  const skG = roleSplitSeason ? roleSplitSeason.skater.g : toNumMaybe(pSeason.g);
-  const skA = roleSplitSeason ? roleSplitSeason.skater.a : toNumMaybe(pSeason.a);
+  const isFlex = !!roleSplitSeason;
 
-  const skPass = roleSplitSeason ? roleSplitSeason.skater.passes : toNumMaybe(pSeason.passes);
-  const skOPass = toNumMaybe(pSeason.offensive_passes);
-  const skDPass = toNumMaybe(pSeason.defensive_passes);
+  const skSource = isFlex ? roleSplitSeason.skater : null;
+  const gSource = isFlex ? roleSplitSeason.goalie : null;
 
-  const skTake = toNumMaybe(pSeason.takeaways);
-  const skOTake = toNumMaybe(pSeason.offensive_takeaways);
-  const skDTake = toNumMaybe(pSeason.defensive_takeaways);
+  const skSplitToi = toNumMaybe(skSource?.toi);
+const skToi = isFlex
+  ? ((skSplitToi != null && skSplitToi > 0) ? skSplitToi : toNumMaybe(pSeason.toi_s ?? pSeason.toi))
+  : toNumMaybe(pSeason.toi_s ?? pSeason.toi);
 
-  const skTurn = toNumMaybe(pSeason.turnovers);
-  const skOTurn = toNumMaybe(pSeason.offensive_turnovers);
-  const skDTurn = toNumMaybe(pSeason.defensive_turnovers);
+  const gSplitToi = toNumMaybe(gSource?.toi);
+const gToi = isFlex
+  ? ((gSplitToi != null && gSplitToi > 0) ? gSplitToi : toNumMaybe(pSeason.toi_g ?? pSeason.toi))
+  : toNumMaybe(pSeason.toi_g ?? pSeason.toi);
 
-  const skXG = toNumMaybe(pSeason.xG);
-  const skShots = toNumMaybe(pSeason.shots);
+  function per15Flex(total, toi) {
+    const t = toNumMaybe(total);
+    if (t == null || toi == null || toi <= 0) return null;
+    return t * 900 / toi;
+  }
 
-  const gPer15 = perGpNormalized(skG, pSeason, "SKATER", true);
-  const xgPer15 = perGpNormalized(skXG, pSeason, "SKATER", true);
+  const skG = isFlex ? toNumMaybe(skSource?.g) : toNumMaybe(pSeason.g);
+  const skA = isFlex ? toNumMaybe(skSource?.a) : toNumMaybe(pSeason.a);
+  const skShots = isFlex ? toNumMaybe(skSource?.shots) : toNumMaybe(pSeason.shots);
+  const skXG = isFlex ? toNumMaybe(skSource?.xG) : toNumMaybe(pSeason.xG);
+
+  const skPass = isFlex ? toNumMaybe(skSource?.passes) : toNumMaybe(pSeason.passes);
+  const skOPass = isFlex ? toNumMaybe(skSource?.offensive_passes) : toNumMaybe(pSeason.offensive_passes);
+  const skDPass = isFlex ? toNumMaybe(skSource?.defensive_passes) : toNumMaybe(pSeason.defensive_passes);
+
+  const skTake = isFlex ? toNumMaybe(skSource?.takeaways) : toNumMaybe(pSeason.takeaways);
+  const skOTake = isFlex ? toNumMaybe(skSource?.offensive_takeaways) : toNumMaybe(pSeason.offensive_takeaways);
+  const skDTake = isFlex ? toNumMaybe(skSource?.defensive_takeaways) : toNumMaybe(pSeason.defensive_takeaways);
+
+  const skTurn = isFlex ? toNumMaybe(skSource?.turnovers) : toNumMaybe(pSeason.turnovers);
+  const skOTurn = isFlex ? toNumMaybe(skSource?.offensive_turnovers) : toNumMaybe(pSeason.offensive_turnovers);
+  const skDTurn = isFlex ? toNumMaybe(skSource?.defensive_turnovers) : toNumMaybe(pSeason.defensive_turnovers);
+
+  const skEntries = isFlex ? toNumMaybe(skSource?.entries) : toNumMaybe(pSeason.entries);
+  const skExits = isFlex ? toNumMaybe(skSource?.exits) : toNumMaybe(pSeason.exits);
+  const skHits = isFlex ? toNumMaybe(skSource?.hits) : toNumMaybe(pSeason.hits);
+  const skBlocks = isFlex ? toNumMaybe(skSource?.blocks) : toNumMaybe(pSeason.blocks);
+  const skPoss = isFlex ? toNumMaybe(skSource?.possession) : (() => {
+    const possKey = pickFirstExisting(pSeason ?? {}, ["possession", "poss", "possessions", "pos_time", "possession_s", "poss_s"]);
+    return possKey ? toNumMaybe(pSeason[possKey]) : null;
+  })();
+
+  const gPer15 = isFlex ? per15Flex(skG, skToi) : perGpNormalized(skG, pSeason, "SKATER", true);
+  const xgPer15 = isFlex ? per15Flex(skXG, skToi) : perGpNormalized(skXG, pSeason, "SKATER", true);
 
   const s = {
     g_15: gPer15,
-    a_15: perGpNormalized(skA, pSeason, "SKATER", true),
+    a_15: isFlex ? per15Flex(skA, skToi) : perGpNormalized(skA, pSeason, "SKATER", true),
     xg_15: xgPer15,
-    shots_15: perGpNormalized(skShots, pSeason, "SKATER", true),
+    shots_15: isFlex ? per15Flex(skShots, skToi) : perGpNormalized(skShots, pSeason, "SKATER", true),
     gfax_15: (gPer15 != null && xgPer15 != null) ? (gPer15 - xgPer15) : null,
 
-    passes_15: perGpNormalized(skPass, pSeason, "SKATER", true),
-    offensive_passes_15: perGpNormalized(skOPass, pSeason, "SKATER", true),
-    defensive_passes_15: perGpNormalized(skDPass, pSeason, "SKATER", true),
+    passes_15: isFlex ? per15Flex(skPass, skToi) : perGpNormalized(skPass, pSeason, "SKATER", true),
+    offensive_passes_15: isFlex ? per15Flex(skOPass, skToi) : perGpNormalized(skOPass, pSeason, "SKATER", true),
+    defensive_passes_15: isFlex ? per15Flex(skDPass, skToi) : perGpNormalized(skDPass, pSeason, "SKATER", true),
 
-    entries_15: perGpNormalized(toNumMaybe(pSeason.entries), pSeason, "SKATER", true),
-    exits_15: perGpNormalized(toNumMaybe(pSeason.exits), pSeason, "SKATER", true),
+    entries_15: isFlex ? per15Flex(skEntries, skToi) : perGpNormalized(skEntries, pSeason, "SKATER", true),
+    exits_15: isFlex ? per15Flex(skExits, skToi) : perGpNormalized(skExits, pSeason, "SKATER", true),
 
-    takeaways_15: perGpNormalized(skTake, pSeason, "SKATER", true),
-    offensive_takeaways_15: perGpNormalized(skOTake, pSeason, "SKATER", true),
-    defensive_takeaways_15: perGpNormalized(skDTake, pSeason, "SKATER", true),
+    takeaways_15: isFlex ? per15Flex(skTake, skToi) : perGpNormalized(skTake, pSeason, "SKATER", true),
+    offensive_takeaways_15: isFlex ? per15Flex(skOTake, skToi) : perGpNormalized(skOTake, pSeason, "SKATER", true),
+    defensive_takeaways_15: isFlex ? per15Flex(skDTake, skToi) : perGpNormalized(skDTake, pSeason, "SKATER", true),
 
-    turnovers_15: perGpNormalized(skTurn, pSeason, "SKATER", true),
-    offensive_turnovers_15: perGpNormalized(skOTurn, pSeason, "SKATER", true),
-    defensive_turnovers_15: perGpNormalized(skDTurn, pSeason, "SKATER", true),
+    turnovers_15: isFlex ? per15Flex(skTurn, skToi) : perGpNormalized(skTurn, pSeason, "SKATER", true),
+    offensive_turnovers_15: isFlex ? per15Flex(skOTurn, skToi) : perGpNormalized(skOTurn, pSeason, "SKATER", true),
+    defensive_turnovers_15: isFlex ? per15Flex(skDTurn, skToi) : perGpNormalized(skDTurn, pSeason, "SKATER", true),
 
-    blocks_15: perGpNormalized(toNumMaybe(pSeason.blocks), pSeason, "SKATER", true),
-    hits_15: perGpNormalized(toNumMaybe(pSeason.hits), pSeason, "SKATER", true),
+    blocks_15: isFlex ? per15Flex(skBlocks, skToi) : perGpNormalized(skBlocks, pSeason, "SKATER", true),
+    hits_15: isFlex ? per15Flex(skHits, skToi) : perGpNormalized(skHits, pSeason, "SKATER", true),
   };
 
-  const possKey = pickFirstExisting(pSeason ?? {}, ["possession", "poss", "possessions", "pos_time", "possession_s", "poss_s"]);
-  if (possKey) {
-    const possPer15Seconds = perGpNormalized(toNumMaybe(pSeason[possKey]), pSeason, "SKATER", true);
+  if (skPoss != null) {
+    const possPer15Seconds = isFlex ? per15Flex(skPoss, skToi) : perGpNormalized(skPoss, pSeason, "SKATER", true);
     s.possession_15 = possPer15Seconds != null ? possPer15Seconds / 60 : null;
   }
 
-  const ga = toNumMaybe(pSeason.ga);
-  const xga = toNumMaybe(pSeason.xGA);
+  const ga = isFlex ? toNumMaybe(gSource?.ga) : toNumMaybe(pSeason.ga);
+  const xga = isFlex ? toNumMaybe(gSource?.xGA) : toNumMaybe(pSeason.xGA);
+  const sa = isFlex ? toNumMaybe(gSource?.sa) : toNumMaybe(pSeason.sa);
+  const gPass = isFlex ? toNumMaybe(gSource?.passes) : toNumMaybe(pSeason.passes);
+
   const gsaxTot = (xga != null && ga != null) ? (xga - ga) : null;
-  const sa = toNumMaybe(pSeason.sa);
-  const svpCsv = toNumMaybe(pSeason.sv_pct);
+  const svTot = (sa != null && ga != null) ? (sa - ga) : null;
+
+  const svpCsv = isFlex ? null : toNumMaybe(pSeason.sv_pct);
   const svp = (svpCsv != null && Number.isFinite(svpCsv))
     ? (svpCsv * 100)
     : (sa != null && sa > 0 && ga != null ? ((sa - ga) / sa) * 100 : null);
 
-  const gPass = roleSplitSeason ? roleSplitSeason.goalie.passes : toNumMaybe(pSeason.passes);
-  const svTot = (sa != null && ga != null) ? (sa - ga) : null;
-
   const g = {
-    sv_15: perGpNormalized(svTot, pSeason, "GOALIE", true),
-    ga_15: perGpNormalized(ga, pSeason, "GOALIE", true),
+    sv_15: isFlex ? per15Flex(svTot, gToi) : perGpNormalized(svTot, pSeason, "GOALIE", true),
+    ga_15: isFlex ? per15Flex(ga, gToi) : perGpNormalized(ga, pSeason, "GOALIE", true),
     svp,
-    gsax_15: perGpNormalized(gsaxTot, pSeason, "GOALIE", true),
-    passes_15: perGpNormalized(gPass, pSeason, "GOALIE", true),
+    gsax_15: isFlex ? per15Flex(gsaxTot, gToi) : perGpNormalized(gsaxTot, pSeason, "GOALIE", true),
+    passes_15: isFlex ? per15Flex(gPass, gToi) : perGpNormalized(gPass, pSeason, "GOALIE", true),
   };
 
-  return { skater: s, goalie: g, possKey };
+  return { skater: s, goalie: g };
 }
 
 
@@ -2728,6 +2812,16 @@ async function renderGameLog(seasonId, advOn, stage, teams, schedule, pSeason, p
     elGameLogStatus.hidden = false;
     elGameLogStatus.textContent = `No stats for Season ${seasonId}.`;
     elPerfChart.innerHTML = "";
+
+    if (elBarsStatus) elBarsStatus.textContent = `No stats for Season ${seasonId}.`;
+    if (elBarsChart) elBarsChart.innerHTML = "";
+
+    const barsCompareWrap = document.getElementById("playerBarsCompareWrap");
+    if (barsCompareWrap) barsCompareWrap.hidden = true;
+
+    const barsHeadline = document.getElementById("playerBarsHeadline");
+    if (barsHeadline) barsHeadline.innerHTML = "";
+
     return;
   }
 
@@ -2736,6 +2830,16 @@ async function renderGameLog(seasonId, advOn, stage, teams, schedule, pSeason, p
     elGameLogStatus.hidden = false;
     elGameLogStatus.textContent = `Plotly failed to load.`;
     elPerfChart.innerHTML = "";
+
+    if (elBarsStatus) elBarsStatus.textContent = `Analytics chart unavailable.`;
+    if (elBarsChart) elBarsChart.innerHTML = "";
+
+    const barsCompareWrap = document.getElementById("playerBarsCompareWrap");
+    if (barsCompareWrap) barsCompareWrap.hidden = true;
+
+    const barsHeadline = document.getElementById("playerBarsHeadline");
+    if (barsHeadline) barsHeadline.innerHTML = "";
+
     return;
   }
 
@@ -2744,17 +2848,12 @@ async function renderGameLog(seasonId, advOn, stage, teams, schedule, pSeason, p
     : `../data/${seasonId}/boxscores.csv`;
 
   const boxOk = await urlExists(boxPath);
-  if (!boxOk) {
-    elGameLogStatus.hidden = false;
-    elGameLogStatus.textContent = `Game log not available yet for Season ${seasonId}.`;
-    elPerfChart.innerHTML = "";
-    return;
-  }
 
   let rows = [];
-  try { rows = await loadCSV(boxPath); }
-  catch { rows = []; }
-
+  if (boxOk) {
+    try { rows = await loadCSV(boxPath); }
+    catch { rows = []; }
+  }
   const tmap = new Map(teams.map(t => [String(t.team_id ?? "").trim(), t]));
   const schedById = new Map((schedule || []).map(s => [String(s.match_id ?? "").trim(), s]));
 
@@ -2779,7 +2878,7 @@ async function renderGameLog(seasonId, advOn, stage, teams, schedule, pSeason, p
 
   // League average SP per appearance, split by role (skater vs goalie)
 function isGoaliePosRow(r) {
-  return String(r.position ?? "").trim().toUpperCase() === "G";
+  return isGoalieBoxRow(r);
 }
 
 const spSkaters = rows
@@ -2808,6 +2907,91 @@ const perfCompareTarget = getPerfCompareTarget({
 }, perfRole);
 const perfCompareBaseline = perfCompareTarget.baseline;
 const perfCompareLabel = perfCompareTarget.compareLabel;
+
+  // -------- Player Bars chart (under performance chart) --------
+try {
+
+  // Only show if adv is on (since we want true /15, not per-GP fallback)
+  if (!advOn) {
+    if (elBarsStatus) elBarsStatus.textContent = `No stats for Season ${seasonId}.`;
+    if (elBarsChart) elBarsChart.innerHTML = "";
+    const barsCompareWrap = document.getElementById("playerBarsCompareWrap");
+    if (barsCompareWrap) barsCompareWrap.hidden = true;
+  } else if (!window.Plotly) {
+    if (elBarsStatus) elBarsStatus.textContent = `Plotly failed to load.`;
+    if (elBarsChart) elBarsChart.innerHTML = "";
+    const barsCompareWrap = document.getElementById("playerBarsCompareWrap");
+    if (barsCompareWrap) barsCompareWrap.hidden = true;
+  } else {
+    const league = computeLeagueAveragesFromBoxscores(rows);
+    const player = readPlayerPer15FromSeasonRow(pSeason, advOn, roleSplitSeason);
+    const seasonPlayers = players; // already loaded earlier in page
+   const maxesSkater = computeLeagueMaxesFromPlayers(seasonPlayers, "SKATER", advOn, rows);
+const minsSkater = computeLeagueMinsFromPlayers(seasonPlayers, "SKATER", advOn, rows);
+const maxesGoalie = computeLeagueMaxesFromPlayers(seasonPlayers, "GOALIE", advOn, rows);
+const minsGoalie = computeLeagueMinsFromPlayers(seasonPlayers, "GOALIE", advOn, rows);
+
+    const gpS = toIntMaybe(pSeason.gp_s) ?? 0;
+    const gpG = toIntMaybe(pSeason.gp_g) ?? 0;
+    const isFlex = (gpS > 0 && gpG > 0);
+
+    let role = "SKATER";
+    if (!isFlex) {
+      role = (gpG > 0 && gpS === 0) ? "GOALIE" : "SKATER";
+    } else {
+      // default to whichever they played more this season
+      role = (gpG > gpS) ? "GOALIE" : "SKATER";
+    }
+
+    if (elBarsToggle) {
+      elBarsToggle.hidden = !isFlex;
+      if (isFlex) {
+        if (!elBarsToggle.__wcplBound) {
+          elBarsToggle.__wcplBound = true;
+          elBarsToggle.addEventListener("click", (ev) => {
+            const btn = ev.target?.closest?.(".seg-btn");
+            const r = btn?.dataset?.role;
+            if (!r) return;
+            elBarsToggle.dataset.role = r;
+            setSegActive(elBarsToggle, r);
+            barsCompareState.role = r;
+            barsCompareState.candidates = buildBarsCompareCandidates(seasonPlayers, teams, pSeason, r);
+            syncBarsCompareControls(r);
+            rerenderPlayerBarsFromState();
+          });
+        }
+
+        elBarsToggle.dataset.role = role;
+        setSegActive(elBarsToggle, role);
+      }
+    }
+
+    barsCompareState.runtime = {
+      advOn,
+      boxRows: rows,
+      league,
+      player,
+      pSeason,
+      maxesSkater,
+      minsSkater,
+      maxesGoalie,
+      minsGoalie,
+      primarySkaterPosGroup
+    };
+    barsCompareState.role = role;
+    barsCompareState.candidates = buildBarsCompareCandidates(seasonPlayers, teams, pSeason, role);
+    syncBarsCompareControls(role);
+
+    if (elBarsStatus) elBarsStatus.textContent = "";
+    rerenderPlayerBarsFromState();
+  }
+} catch (e) {
+  console.warn("Player bars chart failed:", e);
+  if (elBarsStatus) elBarsStatus.textContent = "Analytics chart unavailable.";
+  if (elBarsChart) elBarsChart.innerHTML = "";
+  const barsCompareWrap = document.getElementById("playerBarsCompareWrap");
+  if (barsCompareWrap) barsCompareWrap.hidden = true;
+}
   
 // --- Option B: percent above/below league average ---
 // y% = (SP - leagueAvg) / leagueAvg * 100
@@ -2853,100 +3037,12 @@ const maxAbsLeague = percentile(absAll, 95) ?? 50; // fallback if early season /
     return rNameNorm && playerNameNorm && rNameNorm === playerNameNorm;
   });
 
-  if (mine.length === 0) {
+  if (!boxOk || mine.length === 0) {
     elGameLogStatus.hidden = false;
     elGameLogStatus.textContent = `No games logged yet for Season ${seasonId}.`;
     elPerfChart.innerHTML = "";
     return;
   }
-  
-  // -------- Player Bars chart (under performance chart) --------
-try {
-
-  // Only show if adv is on (since we want true /15, not per-GP fallback)
-  if (!advOn) {
-    if (elBarsStatus) elBarsStatus.textContent = `No stats for Season ${seasonId}.`;
-    if (elBarsChart) elBarsChart.innerHTML = "";
-    const barsCompareWrap = document.getElementById("playerBarsCompareWrap");
-    if (barsCompareWrap) barsCompareWrap.hidden = true;
-  } else if (!window.Plotly) {
-    if (elBarsStatus) elBarsStatus.textContent = `Plotly failed to load.`;
-    if (elBarsChart) elBarsChart.innerHTML = "";
-    const barsCompareWrap = document.getElementById("playerBarsCompareWrap");
-    if (barsCompareWrap) barsCompareWrap.hidden = true;
-  } else {
-    const league = computeLeagueAveragesFromBoxscores(rows);
-    const player = readPlayerPer15FromSeasonRow(pSeason, advOn, roleSplitSeason);
-	const seasonPlayers = players; // already loaded earlier in page
-	const maxesSkater = computeLeagueMaxesFromPlayers(seasonPlayers, "SKATER", advOn);
-	const minsSkater = computeLeagueMinsFromPlayers(seasonPlayers, "SKATER", advOn);
-	const maxesGoalie = computeLeagueMaxesFromPlayers(seasonPlayers, "GOALIE", advOn);
-	const minsGoalie = computeLeagueMinsFromPlayers(seasonPlayers, "GOALIE", advOn);
-
-    const gpS = toIntMaybe(pSeason.gp_s) ?? 0;
-    const gpG = toIntMaybe(pSeason.gp_g) ?? 0;
-    const isFlex = (gpS > 0 && gpG > 0);
-
-    let role = "SKATER";
-    if (!isFlex) {
-      role = (gpG > 0 && gpS === 0) ? "GOALIE" : "SKATER";
-    } else {
-      // default to whichever they played more this season
-      role = (gpG > gpS) ? "GOALIE" : "SKATER";
-    }
-
-    if (elBarsToggle) {
-      elBarsToggle.hidden = !isFlex;
-      if (isFlex) {
-        // bind once
-        if (!elBarsToggle.__wcplBound) {
-          elBarsToggle.__wcplBound = true;
-          elBarsToggle.addEventListener("click", (ev) => {
-            const btn = ev.target?.closest?.(".seg-btn");
-            const r = btn?.dataset?.role;
-            if (!r) return;
-            elBarsToggle.dataset.role = r;
-            setSegActive(elBarsToggle, r);
-            const teamColor = resolveTeamColorForBars();
-            barsCompareState.role = r;
-            barsCompareState.candidates = buildBarsCompareCandidates(seasonPlayers, teams, pSeason, r);
-            syncBarsCompareControls(r);
-            rerenderPlayerBarsFromState();
-          });
-        }
-
-        // initial active state
-        elBarsToggle.dataset.role = role;
-        setSegActive(elBarsToggle, role);
-      }
-    }
-
-    barsCompareState.runtime = {
-      advOn,
-      boxRows: rows,
-      league,
-      player,
-      pSeason,
-      maxesSkater,
-      minsSkater,
-      maxesGoalie,
-      minsGoalie,
-	  primarySkaterPosGroup
-    };
-    barsCompareState.role = role;
-    barsCompareState.candidates = buildBarsCompareCandidates(seasonPlayers, teams, pSeason, role);
-    syncBarsCompareControls(role);
-
-    if (elBarsStatus) elBarsStatus.textContent = "";
-    rerenderPlayerBarsFromState();
-  }
-} catch (e) {
-  console.warn("Player bars chart failed:", e);
-  if (elBarsStatus) elBarsStatus.textContent = "Analytics chart unavailable.";
-  if (elBarsChart) elBarsChart.innerHTML = "";
-  const barsCompareWrap = document.getElementById("playerBarsCompareWrap");
-  if (barsCompareWrap) barsCompareWrap.hidden = true;
-}
 
   // Sort by match_id (works with your M1-G1 scheme) and take last 10
 mine.sort((a, b) => {

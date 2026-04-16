@@ -22,6 +22,8 @@ let advOn = false;
 let seasons = [];
 let teams = [];
 let players = [];
+let boxscores = [];
+
 
 // Click-sort state (Teams-style)
 let sortKey = null;
@@ -94,6 +96,125 @@ function setPlayoffsOptionEnabled(enabled) {
   if (!enabled && elStage.value === "PO") elStage.value = "REG";
 }
 
+function normalizeName(s) {
+  return String(s ?? "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "")
+    .trim();
+}
+
+function isGoalieBoxRow(r) {
+  const pos = String(r.position ?? "").trim().toUpperCase();
+  if (pos === "G") return true;
+  const sa = toIntMaybe(r.sa);
+  const ga = toIntMaybe(r.ga);
+  return (sa != null || ga != null);
+}
+
+function computeRoleSplitFromBoxscores(boxRows, pSeason) {
+  const playerSteam =
+    String(pSeason.steam_id ?? pSeason.steamid ?? pSeason.steamID ?? pSeason.steam ?? pSeason.steam64 ?? "").trim();
+  const playerNameNorm = normalizeName(pSeason.name);
+
+  function isMe(r) {
+    const rSteam = String(
+      r.steam_id ?? r.steamid ?? r.steamID ?? r.steam ?? r.steam64 ?? ""
+    ).trim();
+
+    if (playerSteam && rSteam && rSteam === playerSteam) return true;
+
+    const rowNameNorm = normalizeName(
+      r.player_name ?? r.name ?? r.player ?? r.playerName ?? ""
+    );
+
+    return rowNameNorm && playerNameNorm && rowNameNorm === playerNameNorm;
+  }
+
+  function addNum(bucket, key, val) {
+    bucket[key] = (bucket[key] ?? 0) + (toNumMaybe(val) ?? 0);
+  }
+
+  const out = {
+    skater: {
+      g: 0, a: 0, pts: 0,
+      shots: 0,
+      passes: 0,
+      entries: 0,
+      exits: 0,
+      takeaways: 0,
+      turnovers: 0,
+      hits: 0,
+      blocks: 0,
+      xG: 0,
+      sp: 0,
+      possession_s: 0,
+      toi: 0
+    },
+    goalie: {
+      pts: 0,
+      passes: 0,
+      sa: 0,
+      ga: 0,
+      xGA: 0,
+      wins: 0,
+      so: 0,
+      sp: 0,
+      toi: 0
+    }
+  };
+
+  for (const r of (boxRows || [])) {
+    if (!isMe(r)) continue;
+
+    const isG = isGoalieBoxRow(r);
+    const bucket = isG ? out.goalie : out.skater;
+
+    if (isG) {
+      addNum(bucket, "pts", (toNumMaybe(r.g) ?? 0) + (toNumMaybe(r.a) ?? 0));
+      addNum(bucket, "passes", r.passes);
+      addNum(bucket, "sa", r.sa);
+      addNum(bucket, "ga", r.ga);
+      addNum(bucket, "xGA", r.xGA ?? r.xga);
+      addNum(bucket, "wins", r.w ?? r.wins);
+      addNum(bucket, "so", r.so);
+      addNum(bucket, "sp", r.sp);
+      addNum(bucket, "toi", r.toi_g ?? r.toi_s ?? r.toi);
+    } else {
+      addNum(bucket, "g", r.g);
+      addNum(bucket, "a", r.a);
+      addNum(bucket, "pts", (toNumMaybe(r.g) ?? 0) + (toNumMaybe(r.a) ?? 0));
+      addNum(bucket, "shots", r.shots);
+      addNum(bucket, "passes", r.passes);
+      addNum(bucket, "entries", r.entries);
+      addNum(bucket, "exits", r.exits);
+      addNum(bucket, "takeaways", r.takeaways);
+      addNum(bucket, "turnovers", r.turnovers);
+      addNum(bucket, "hits", r.hits);
+      addNum(bucket, "blocks", r.blocks);
+      addNum(bucket, "xG", r.xG ?? r.xg);
+      addNum(bucket, "sp", r.sp);
+      addNum(bucket, "possession_s", r.possession_s ?? r.possession ?? r.poss_s ?? r.poss);
+      addNum(bucket, "toi", r.toi_s ?? r.toi);
+    }
+  }
+
+  return out;
+}
+
+function getFlexSplitForPlayer(p) {
+  const gpS = toIntMaybe(p.gp_s) ?? 0;
+  const gpG = toIntMaybe(p.gp_g) ?? 0;
+  if (!(gpS > 0 && gpG > 0)) return null;
+  return computeRoleSplitFromBoxscores(boxscores, p);
+}
+
+function per15WithToi(total, toi) {
+  const t = toNumMaybe(total);
+  const secs = toNumMaybe(toi);
+  if (t == null || secs == null || secs <= 0) return null;
+  return t * 900 / secs;
+}
+
 async function refresh() {
   const seasonId = getSeasonId();
   const schedPath = `../data/${seasonId}/schedule.csv`;
@@ -140,9 +261,16 @@ applyDefaultStage(elStage, seasonId, {
     const playersPath = (stage === "PO" && hasPlayoffs)
       ? playoffPlayersPath
       : regularPlayersPath;
+	  
+	  	const boxscoresPath = (stage === "PO" && hasPlayoffs)
+  ? `../data/${seasonId}/boxscores_playoffs.csv`
+  : `../data/${seasonId}/boxscores.csv`;
 
     // Now load players
-    players = await loadCSV(playersPath);
+    [players, boxscores] = await Promise.all([
+  loadCSV(playersPath),
+  loadCSV(boxscoresPath).catch(() => [])
+]);
 
     // Default sort based on current mode
     setDefaultSortForMode(elPos.value);
@@ -256,68 +384,81 @@ if (teamId === "FREE_AGENT") {
 
   // --- map/decorate ---
   const rows = view.map(p => {
-    const g = toIntMaybe(p.g) ?? 0;
-
-    // Shots + SH% (store as rate for sorting, percent for display)
-    const shotsRaw = (p.shots ?? "").toString().trim();
-    const shotsVal = shotsRaw === "" ? null : Number(shotsRaw);
-    const shots = Number.isFinite(shotsVal) ? shotsVal : null;
-    const shRate = (shots !== null && shots > 0) ? (g / shots) : null; // 0-1
-
+	  const roleSplit = getFlexSplitForPlayer(p);
+const skToi = roleSplit ? toNumMaybe(roleSplit.skater.toi) : toNumMaybe(p.toi_s ?? p.toi);
+const gkToi = roleSplit ? toNumMaybe(roleSplit.goalie.toi) : toNumMaybe(p.toi_g ?? p.toi);
 const gp_s = toIntMaybe(p.gp_s) ?? 0;
-const pts  = toIntMaybe(p.pts) ?? 0;
 
-const gDisp = valueMaybePer15(g, p, "SKATER", advOn, rateMode);
-const aDisp = valueMaybePer15(toIntMaybe(p.a) ?? 0, p, "SKATER", advOn, rateMode);
+const g = roleSplit ? (toNumMaybe(roleSplit.skater.g) ?? 0) : (toIntMaybe(p.g) ?? 0);
+const aRaw = roleSplit ? (toNumMaybe(roleSplit.skater.a) ?? 0) : (toIntMaybe(p.a) ?? 0);
+const pts  = roleSplit ? (toNumMaybe(roleSplit.skater.pts) ?? 0) : (toIntMaybe(p.pts) ?? 0);
 
-const sp = toNumMaybe(p.sp);
+const shots = roleSplit ? toNumMaybe(roleSplit.skater.shots) : (() => {
+  const shotsRaw = (p.shots ?? "").toString().trim();
+  const shotsVal = shotsRaw === "" ? null : Number(shotsRaw);
+  return Number.isFinite(shotsVal) ? shotsVal : null;
+})();
 
-const xg = toNumMaybe(p.xG);
-const xgDisp = valueMaybePer15(xg, p, "SKATER", advOn, rateMode);
+const shRate = (shots !== null && shots > 0) ? (g / shots) : null;
 
+const sp = roleSplit ? toNumMaybe(roleSplit.skater.sp) : toNumMaybe(p.sp);
+const xg = roleSplit ? toNumMaybe(roleSplit.skater.xG) : toNumMaybe(p.xG);
 const gfax = (xg != null) ? (g - xg) : null;
-const gfaxDisp = valueMaybePer15(gfax, p, "SKATER", advOn, rateMode);
 
-const ptsDisp  = valueMaybePer15(pts, p, "SKATER", advOn, rateMode);
-const shotsDisp= valueMaybePer15(shots, p, "SKATER", advOn, rateMode);
-const hitsDisp = valueMaybePer15(toIntMaybe(p.hits), p, "SKATER", advOn, rateMode);
-const blocksDisp = valueMaybePer15(toIntMaybe(p.blocks), p, "SKATER", advOn, rateMode);
-const passesDisp = valueMaybePer15(toIntMaybe(p.passes), p, "SKATER", advOn, rateMode);
-const taDisp   = valueMaybePer15(toIntMaybe(p.takeaways), p, "SKATER", advOn, rateMode);
-const toDisp   = valueMaybePer15(toIntMaybe(p.turnovers), p, "SKATER", advOn, rateMode);
-const spDisp   = valueMaybePer15(sp, p, "SKATER", advOn, rateMode);
-const possSeconds = toNumMaybe(p.possession_s);
-const possMinutes = (possSeconds != null) ? possSeconds / 60 : null;
+const hitsRaw = roleSplit ? toNumMaybe(roleSplit.skater.hits) : toIntMaybe(p.hits);
+const blocksRaw = roleSplit ? toNumMaybe(roleSplit.skater.blocks) : toIntMaybe(p.blocks);
+const passesRaw = roleSplit ? toNumMaybe(roleSplit.skater.passes) : toIntMaybe(p.passes);
+const taRaw = roleSplit ? toNumMaybe(roleSplit.skater.takeaways) : toIntMaybe(p.takeaways);
+const toRaw = roleSplit ? toNumMaybe(roleSplit.skater.turnovers) : toIntMaybe(p.turnovers);
+const entriesRaw = roleSplit ? toNumMaybe(roleSplit.skater.entries) : toIntMaybe(p.entries);
+const exitsRaw = roleSplit ? toNumMaybe(roleSplit.skater.exits) : toIntMaybe(p.exits);
+const possSeconds = roleSplit ? toNumMaybe(roleSplit.skater.possession_s) : toNumMaybe(p.possession_s);
 
-// Totals = minutes
-// Per 15 = seconds per 15 (normalized)
+const gDisp      = (rateMode === "P15") ? per15WithToi(g, skToi) : g;
+const aDisp      = (rateMode === "P15") ? per15WithToi(aRaw, skToi) : aRaw;
+const ptsDisp    = (rateMode === "P15") ? per15WithToi(pts, skToi) : pts;
+const shotsDisp  = (rateMode === "P15") ? per15WithToi(shots, skToi) : shots;
+const hitsDisp   = (rateMode === "P15") ? per15WithToi(hitsRaw, skToi) : hitsRaw;
+const blocksDisp = (rateMode === "P15") ? per15WithToi(blocksRaw, skToi) : blocksRaw;
+const passesDisp = (rateMode === "P15") ? per15WithToi(passesRaw, skToi) : passesRaw;
+const taDisp     = (rateMode === "P15") ? per15WithToi(taRaw, skToi) : taRaw;
+const toDisp     = (rateMode === "P15") ? per15WithToi(toRaw, skToi) : toRaw;
+const xgDisp     = (rateMode === "P15") ? per15WithToi(xg, skToi) : xg;
+const gfaxDisp   = (rateMode === "P15") ? per15WithToi(gfax, skToi) : gfax;
+const spDisp     = (rateMode === "P15") ? per15WithToi(sp, skToi) : sp;
+
 const possDisp = (rateMode === "P15")
-  ? valueMaybePer15(possSeconds, p, "SKATER", advOn, rateMode)
-  : possMinutes;
+  ? per15WithToi(possSeconds, skToi)
+  : (possSeconds != null ? possSeconds / 60 : null);
 
     // Goalie stats
-    const gp_g = toIntMaybe(p.gp_g) ?? 0;
-    const svp = toNumMaybe(p.sv_pct); // 0-1 in CSV
-    const gaa = toNumMaybe(p.gaa);
-    const sa = toIntMaybe(p.sa);
-    const ga = toIntMaybe(p.ga);
-    const sv = (sa != null && ga != null) ? (sa - ga) : null;
-	
-	const saDisp = valueMaybePer15(sa, p, "GOALIE", advOn, rateMode);
-	const gaDisp = valueMaybePer15(ga, p, "GOALIE", advOn, rateMode);
-	const svDisp = valueMaybePer15(sv, p, "GOALIE", advOn, rateMode);
+const gp_g = toIntMaybe(p.gp_g) ?? 0;
 
-	const wRaw  = toIntMaybe(p.wins);
-	const soRaw = toIntMaybe(p.so);
+const sa = roleSplit ? toNumMaybe(roleSplit.goalie.sa) : toIntMaybe(p.sa);
+const ga = roleSplit ? toNumMaybe(roleSplit.goalie.ga) : toIntMaybe(p.ga);
+const sv = (sa != null && ga != null) ? (sa - ga) : null;
 
-	const wDisp  = valueMaybePer15(wRaw, p, "GOALIE", advOn, rateMode);
-	const soDisp = valueMaybePer15(soRaw, p, "GOALIE", advOn, rateMode);
+const svp = (sa != null && sa > 0 && sv != null)
+  ? (sv / sa)
+  : toNumMaybe(p.sv_pct);
 
-	const xga = toNumMaybe(p.xGA);
-	const xgaDisp = valueMaybePer15(xga, p, "GOALIE", advOn, rateMode);
+const gaa = (ga != null && gkToi != null && gkToi > 0)
+  ? (ga * 900 / gkToi)
+  : toNumMaybe(p.gaa);
 
-	const gsax = (xga != null && ga != null) ? (xga - ga) : null;
-	const gsaxDisp = valueMaybePer15(gsax, p, "GOALIE", advOn, rateMode);
+const wRaw  = roleSplit ? toNumMaybe(roleSplit.goalie.wins) : toIntMaybe(p.wins);
+const soRaw = roleSplit ? toNumMaybe(roleSplit.goalie.so) : toIntMaybe(p.so);
+const goaliePtsRaw = roleSplit ? toNumMaybe(roleSplit.goalie.pts) : toIntMaybe(p.pts);
+const xga = roleSplit ? toNumMaybe(roleSplit.goalie.xGA) : toNumMaybe(p.xGA);
+const gsax = (xga != null && ga != null) ? (xga - ga) : null;
+
+const saDisp   = (rateMode === "P15") ? per15WithToi(sa, gkToi) : sa;
+const gaDisp   = (rateMode === "P15") ? per15WithToi(ga, gkToi) : ga;
+const svDisp   = (rateMode === "P15") ? per15WithToi(sv, gkToi) : sv;
+const wDisp    = (rateMode === "P15") ? per15WithToi(wRaw, gkToi) : wRaw;
+const soDisp   = (rateMode === "P15") ? per15WithToi(soRaw, gkToi) : soRaw;
+const xgaDisp  = (rateMode === "P15") ? per15WithToi(xga, gkToi) : xga;
+const gsaxDisp = (rateMode === "P15") ? per15WithToi(gsax, gkToi) : gsax;
 	
 	
 
@@ -328,38 +469,38 @@ const possDisp = (rateMode === "P15")
       team_id: (p.team_id ?? "").trim(),
 
       // skater
-      gp_s,
+            gp_s,
       g,
       gDisp,
-      a: toIntMaybe(p.a) ?? 0,
+      a: aRaw,
       aDisp,
 
-pts,
-ptsDisp,
-shots: (shots !== null ? Math.trunc(shots) : null),
-shotsDisp,
-shRate,
+      pts,
+      ptsDisp,
+      shots: (shots !== null ? Math.trunc(shots) : null),
+      shotsDisp,
+      shRate,
 
-hits: toIntMaybe(p.hits),
-hitsDisp,
-blocks: toIntMaybe(p.blocks),
-blocksDisp,
-passes: toIntMaybe(p.passes),
-passesDisp,
-ta: toIntMaybe(p.takeaways),
-taDisp,
-to: toIntMaybe(p.turnovers),
-toDisp,
-possDisp,
+      hits: hitsRaw,
+      hitsDisp,
+      blocks: blocksRaw,
+      blocksDisp,
+      passes: passesRaw,
+      passesDisp,
+      ta: taRaw,
+      taDisp,
+      to: toRaw,
+      toDisp,
+      possDisp,
 
-xg,
-xgDisp,
+      xg,
+      xgDisp,
 
-gfax,
-gfaxDisp,
+      gfax,
+      gfaxDisp,
 
-sp,
-spDisp,
+      sp,
+      spDisp,
 
       // goalie
       gp_g,
