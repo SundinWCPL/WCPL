@@ -1415,10 +1415,6 @@ function renderPlayoffsBracket(seasonId, teams, games, schedule){
       const completedN = completed.length;
       const seriesFinal = (scheduledN > 0 && completedN >= scheduledN);
 
-      const statusText = seriesFinal
-        ? "Final"
-        : (completedN ? "In progress" : "Scheduled");
-
       let homeWins = 0;
       let awayWins = 0;
 
@@ -1434,6 +1430,21 @@ function renderPlayoffsBracket(seasonId, teams, games, schedule){
         if (winner === srs.home) homeWins++;
         else if (winner === srs.away) awayWins++;
       }
+	  
+	  let statusText = completedN ? "In progress" : "Scheduled";
+
+if (seriesFinal) {
+  if (r.st === "f") {
+    const seasonNum = seasonNumberFromId(seasonId);
+    const winnerId = homeWins > awayWins ? srs.home : srs.away;
+    statusText = `${winnerId} wins WCPL Season ${seasonNum ?? seasonId}`;
+  } else {
+    const winnerId = homeWins > awayWins ? srs.home : srs.away;
+    const winnerWins = Math.max(homeWins, awayWins);
+    const loserWins = Math.min(homeWins, awayWins);
+    statusText = ` ${winnerId} wins series ${winnerWins}-${loserWins}`;
+  }
+}
 
       const homeTeam = teamById.get(srs.home) || null;
       const awayTeam = teamById.get(srs.away) || null;
