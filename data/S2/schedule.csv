@@ -110,12 +110,12 @@ M36-G3,9,MOFO,CG67,reg,final,2026-04-12
 M37-G1,10,AS1,AS2,as,scheduled,
 M37-G2,10,AS1,AS2,as,scheduled,
 M37-G3,10,AS1,AS2,as,scheduled,
-M38-G1,10,MOFO,PP,qf,scheduled,
-M38-G2,10,MOFO,PP,qf,scheduled,
-M38-G3,10,MOFO,PP,qf,scheduled,
-M39-G1,10,LBR,RR,qf,scheduled,
-M39-G2,10,LBR,RR,qf,scheduled,
-M39-G3,10,LBR,RR,qf,scheduled,
+M38-G1,10,LBR,RR,qf,final,2026-04-17
+M38-G2,10,LBR,RR,qf,final,2026-04-17
+M38-G3,10,LBR,RR,qf,final,2026-04-17
+M39-G1,10,MOFO,PP,qf,scheduled,
+M39-G2,10,MOFO,PP,qf,scheduled,
+M39-G3,10,MOFO,PP,qf,scheduled,
 M40-G1,11,TOR,QF 2nd,sf,scheduled,
 M40-G2,11,TOR,QF 2nd,sf,scheduled,
 M40-G3,11,TOR,QF 2nd,sf,scheduled,

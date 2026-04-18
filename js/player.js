@@ -217,14 +217,12 @@ async function computeCareerRoleSplitFromAllSeasons(seasonsMeta, stage, pSeason)
 
     // ---- CASE 1: Modern season (has boxscores) ----
     if (advThisSeason) {
-      const boxPath = (stage === "PO")
-        ? `../data/${sid}/boxscores_playoffs.csv`
-        : `../data/${sid}/boxscores.csv`;
+const schedPath = `../data/${sid}/schedule.csv`;
+const seasonSchedule = await loadCSV(schedPath).catch(() => []);
+const boxRows = await loadStageBoxscores(sid, stage, seasonSchedule).catch(() => []);
+if (!boxRows.length) continue;
 
-      const boxRows = await loadCSV(boxPath).catch(() => null);
-      if (!boxRows || !boxRows.length) continue;
-
-      const split = computeRoleSplitFromBoxscores(boxRows, pSeason);
+const split = computeRoleSplitFromBoxscores(boxRows, pSeason);
       total = mergeRoleSplitTotals(total, split);
     }
 
@@ -255,6 +253,21 @@ async function computeCareerRoleSplitFromAllSeasons(seasonsMeta, stage, pSeason)
   return total;
 }
 
+function rowMatchesStage(matchId, stage, schedById) {
+  const sched = schedById.get(String(matchId ?? "").trim());
+  const rowStage = String(sched?.stage ?? "reg").trim().toLowerCase();
+
+  if (stage === "PO") {
+    return rowStage !== "reg";
+  }
+  return rowStage === "reg";
+}
+
+async function loadStageBoxscores(seasonId, stage, scheduleRows) {
+  const allRows = await loadCSV(`../data/${seasonId}/boxscores.csv`).catch(() => []);
+  const schedById = new Map((scheduleRows || []).map(s => [String(s.match_id ?? "").trim(), s]));
+  return allRows.filter(r => rowMatchesStage(r.match_id, stage, schedById));
+}
 
 async function refresh() {
   const seasonId = getSeasonId();
@@ -333,12 +346,8 @@ const s_gp = toIntMaybe(pSeason.gp_s) ?? 0;
 const g_gp = toIntMaybe(pSeason.gp_g) ?? 0;
 
 if (s_gp > 0 && g_gp > 0) {
-  const boxPath = (stage === "PO")
-    ? `../data/${seasonId}/boxscores_playoffs.csv`
-    : `../data/${seasonId}/boxscores.csv`;
-
-  const boxRows = await loadCSV(boxPath).catch(() => []);
-  roleSplitSeason = computeRoleSplitFromBoxscores(boxRows, pSeason);
+const boxRows = await loadStageBoxscores(seasonId, stage, schedule);
+roleSplitSeason = computeRoleSplitFromBoxscores(boxRows, pSeason);
 }
 
 // Career split (always compute; cheap + prevents flex contamination across seasons)
@@ -2843,17 +2852,13 @@ async function renderGameLog(seasonId, advOn, stage, teams, schedule, pSeason, p
     return;
   }
 
-  const boxPath = (stage === "PO")
-    ? `../data/${seasonId}/boxscores_playoffs.csv`
-    : `../data/${seasonId}/boxscores.csv`;
-
-  const boxOk = await urlExists(boxPath);
-
-  let rows = [];
-  if (boxOk) {
-    try { rows = await loadCSV(boxPath); }
-    catch { rows = []; }
-  }
+let rows = [];
+try {
+  rows = await loadStageBoxscores(seasonId, stage, schedule);
+} catch {
+  rows = [];
+}
+const boxOk = rows.length > 0;
   const tmap = new Map(teams.map(t => [String(t.team_id ?? "").trim(), t]));
   const schedById = new Map((schedule || []).map(s => [String(s.match_id ?? "").trim(), s]));
 
