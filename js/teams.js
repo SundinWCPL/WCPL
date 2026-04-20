@@ -441,9 +441,13 @@ function render() {
   const conf = elConf.value;
 
   let view = standings.slice();
+
   if (conf !== "__ALL__") {
     view = view.filter(r => String(r.conference ?? "") === conf);
   }
+
+  // Hide teams with 0 GP
+  view = view.filter(r => (r.GP ?? 0) > 0);
 
   view.sort((a, b) => compareByKey(a, b, sortKey, sortDir));
   updateSortIndicators();
