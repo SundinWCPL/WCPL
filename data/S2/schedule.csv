@@ -115,16 +115,15 @@ M38-G2,10,LBR,RR,qf,final,2026-04-17
 M38-G3,10,LBR,RR,qf,final,2026-04-17
 M39-G1,10,MOFO,PP,qf,final,2026-04-19
 M39-G2,10,MOFO,PP,qf,final,2026-04-19
-M40-G1,11,TOR,LBR,sf,scheduled,
-M40-G2,11,TOR,LBR,sf,scheduled,
-M40-G3,11,TOR,LBR,sf,scheduled,
-M40-G4,11,TOR,LBR,sf,scheduled,
-M40-G5,11,TOR,LBR,sf,scheduled,
-M41-G1,11,FOX,MOFO,sf,scheduled,
-M41-G2,11,FOX,MOFO,sf,scheduled,
-M41-G3,11,FOX,MOFO,sf,scheduled,
-M41-G4,11,FOX,MOFO,sf,scheduled,
-M41-G5,11,FOX,MOFO,sf,scheduled,
+M40-G1,11,FOX,MOFO,sf,final,2026-04-23
+M40-G2,11,FOX,MOFO,sf,final,2026-04-23
+M40-G3,11,FOX,MOFO,sf,final,2026-04-23
+M40-G4,11,FOX,MOFO,sf,final,2026-04-23
+M41-G1,11,TOR,LBR,sf,scheduled,
+M41-G2,11,TOR,LBR,sf,scheduled,
+M41-G3,11,TOR,LBR,sf,scheduled,
+M41-G4,11,TOR,LBR,sf,scheduled,
+M41-G5,11,TOR,LBR,sf,scheduled,
 M42-G1,12,SF 1st,SF 2nd,f,scheduled,
 M42-G2,12,SF 1st,SF 2nd,f,scheduled,
 M42-G3,12,SF 1st,SF 2nd,f,scheduled,
