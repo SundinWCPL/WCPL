@@ -256,6 +256,20 @@ applyDefaultStage(elStage, seasonId, {
   playoffsBegun
 });
 
+// Build match_id -> stage map
+const matchStage = new Map();
+
+for (const s of schedule) {
+  const mid = String(s.match_id ?? "").trim();
+  const st = String(s.stage ?? "").trim().toLowerCase();
+
+  if (mid && st) {
+    matchStage.set(mid, st);
+  }
+}
+
+
+
     // Decide which players file to load
     const stage = elStage.value; // "REG" | "PO"
     const playersPath = (stage === "PO" && hasPlayoffs)
@@ -267,10 +281,27 @@ applyDefaultStage(elStage, seasonId, {
   : `../data/${seasonId}/boxscores.csv`;
 
     // Now load players
-    [players, boxscores] = await Promise.all([
+[players, boxscores] = await Promise.all([
   loadCSV(playersPath),
   loadCSV(boxscoresPath).catch(() => [])
 ]);
+
+// Filter boxscores based on selected stage
+const stageKey = (stage === "PO") ? "po" : "reg";
+
+boxscores = boxscores.filter(r => {
+  const mid = String(r.match_id ?? "").trim();
+  const st = matchStage.get(mid);
+
+  if (!st) return false;
+
+  if (stageKey === "reg") {
+    return st === "reg";
+  }
+
+  // playoffs view
+  return st === "qf" || st === "sf" || st === "f";
+});
 
     // Default sort based on current mode
     setDefaultSortForMode(elPos.value);
