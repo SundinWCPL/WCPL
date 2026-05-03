@@ -124,8 +124,6 @@ M41-G2,11,TOR,LBR,sf,final,2026-04-26
 M41-G3,11,TOR,LBR,sf,final,2026-04-26
 M41-G4,11,TOR,LBR,sf,final,2026-04-26
 M41-G5,11,TOR,LBR,sf,final,2026-04-26
-M42-G1,12,TOR,FOX,f,scheduled,
-M42-G2,12,TOR,FOX,f,scheduled,
-M42-G3,12,TOR,FOX,f,scheduled,
-M42-G4,12,TOR,FOX,f,scheduled,
-M42-G5,12,TOR,FOX,f,scheduled,
+M42-G1,12,TOR,FOX,f,final,2026-05-02
+M42-G2,12,TOR,FOX,f,final,2026-05-02
+M42-G3,12,TOR,FOX,f,final,2026-05-02
