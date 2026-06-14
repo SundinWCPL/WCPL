@@ -1,6 +1,6 @@
 // js/team.js
 import { loadCSV, toIntMaybe, toNumMaybe } from "./data.js";
-import { initSeasonPicker, getSeasonId, onSeasonChange, saveStage, playoffsHaveBegun, applyDefaultStage } from "./season.js";
+import { initSeasonPicker, getSeasonId, onSeasonChange, saveStage, playoffsHaveBegun, applyDefaultStage, getDataPath, getLogoPath } from "./season.js";
 
 const elSeason = document.getElementById("seasonSelect");
 const elStatus = document.getElementById("status");
@@ -141,18 +141,18 @@ async function refresh() {
   setStatus(`Loading ${seasonId} / ${teamId}…`);
 
   try {
-    const teamsPath = `../data/${seasonId}/teams.csv`;
-    const regularPlayersPath = `../data/${seasonId}/players.csv`;
-	const playoffPlayersPath = `../data/${seasonId}/players_playoffs.csv`;
+    const teamsPath = getDataPath("teams.csv", seasonId);
+    const regularPlayersPath = getDataPath("players.csv", seasonId);
+	const playoffPlayersPath = getDataPath("players_playoffs.csv", seasonId);
 
 	// Detect if playoffs file exists for this season; disable option if not.
 	const hasPlayoffs = await urlExists(playoffPlayersPath);
 	setPlayoffsOptionEnabled(hasPlayoffs);
 	
 	const seasonsPath = `../data/seasons.csv`;
-const gamesPath   = `../data/${seasonId}/games.csv`;
-const schedPath   = `../data/${seasonId}/schedule.csv`;
-const boxPath = `../data/${seasonId}/boxscores.csv`;
+const gamesPath   = getDataPath("games.csv", seasonId);
+const schedPath   = getDataPath("schedule.csv", seasonId);
+const boxPath = getDataPath("boxscores.csv", seasonId);
 
 	// Load core first (need schedule+games to auto-default stage)
 const [seasons, teams, games, schedule, boxscores] = await Promise.all([
@@ -263,7 +263,7 @@ function renderHero(seasonId, team, rec, stageMode, poLabel) {
   elName.textContent = teamName;
 
   // Big logo
-  elLogo.src = `../logos/${seasonId}/${team.team_id}.png`;
+  elLogo.src = getLogoPath(team.team_id, seasonId);
   elLogo.alt = `${teamName} logo`;
   elLogo.style.visibility = "visible";
   elLogo.onerror = () => (elLogo.style.visibility = "hidden");

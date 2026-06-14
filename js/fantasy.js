@@ -1,5 +1,5 @@
 import { loadCSV } from "./data.js";
-import { initSeasonPicker, getSeasonId, onSeasonChange } from "./season.js";
+import { initSeasonPicker, getSeasonId, onSeasonChange, getDataPath, getLogoPath } from "./season.js";
 
 const elSeason = document.getElementById("seasonSelect");
 const elStatus = document.getElementById("status");
@@ -45,8 +45,8 @@ async function refresh() {
   playersRows = [];           // NEW
 
   try {
-    const fantasyPath = `../data/${seasonId}/fantasy.csv`;
-    const playersPath = `../data/${seasonId}/players.csv`;
+    const fantasyPath = getDataPath("fantasy.csv", seasonId);
+    const playersPath = getDataPath("players.csv", seasonId);
 
     [fantasyRows, playersRows] = await Promise.all([
       loadCSV(fantasyPath),

@@ -1,6 +1,6 @@
 // js/index.js
 import { loadCSV, toIntMaybe, toNumMaybe } from "./data.js";
-import { initSeasonPicker, getSeasonId, onSeasonChange, saveStage, playoffsHaveBegun, applyDefaultStage } from "./season.js";
+import { initSeasonPicker, getSeasonId, onSeasonChange, saveStage, playoffsHaveBegun, applyDefaultStage, getDataPath, getLogoPath } from "./season.js";
 
 const elSeason = document.getElementById("seasonSelect");
 const elStatus = document.getElementById("status");
@@ -89,14 +89,12 @@ async function refresh() {
   setEmptyState(true, `Loading ${seasonId}…`);
 
   try {
-    const base = dataBase();
-
-const teamsPath = `${base}/${seasonId}/teams.csv`;
-const regularPlayersPath = `${base}/${seasonId}/players.csv`;
-const playoffPlayersPath = `${base}/${seasonId}/players_playoffs.csv`;
-const gamesPath = `${base}/${seasonId}/games.csv`;
-const schedPath = `${base}/${seasonId}/schedule.csv`;
-const seasonsPath = `${base}/seasons.csv`;
+const teamsPath = getDataPath("teams.csv", seasonId);
+const regularPlayersPath = getDataPath("players.csv", seasonId);
+const playoffPlayersPath = getDataPath("players_playoffs.csv", seasonId);
+const gamesPath = getDataPath("games.csv", seasonId);
+const schedPath = getDataPath("schedule.csv", seasonId);
+const seasonsPath = `${dataBase()}/seasons.csv`;
 
 // Enable/disable the playoffs mode based on playoffs players file existing
 const hasPlayoffsPlayers = await urlExists(playoffPlayersPath);
@@ -441,7 +439,7 @@ function buildSchedLogo(seasonId, teamId, teamRow, side = "") {
   const img = document.createElement("img");
   img.loading = "lazy";
   img.alt = `${teamId} logo`;
-  img.src = `logos/${seasonId}/${teamId}.png`;
+  img.src = getLogoPath(teamId, seasonId);
   img.onerror = () => (img.style.visibility = "hidden");
   logoWrap.appendChild(img);
 
@@ -673,7 +671,7 @@ function buildSchedTeamRow(seasonId, teamId, teamRow, score, side = "") {
     const img = document.createElement("img");
     img.loading = "lazy";
     img.alt = `${teamId} logo`;
-    img.src = `logos/${seasonId}/${teamId}.png`;
+    img.src = getLogoPath(teamId, seasonId);
     img.onerror = () => (img.style.visibility = "hidden");
     logoWrap.appendChild(img);
   }
@@ -984,7 +982,7 @@ if (showClinchMarks) {
   img.className = "logo";
   img.loading = "lazy";
   img.alt = `${r.team_id} logo`;
-  img.src = `logos/${seasonId}/${r.team_id}.png`;
+  img.src = getLogoPath(r.team_id, seasonId);
   img.onerror = () => (img.style.visibility = "hidden");
   tdLogo.appendChild(img);
   tr.appendChild(tdLogo);
@@ -1251,7 +1249,7 @@ function tdLogoCellHome(seasonId, teamId, teamRow) {
   img.className = "logo";
   img.loading = "lazy";
   img.alt = `${teamId} logo`;
-  img.src = `logos/${seasonId}/${teamId}.png`;
+  img.src = getLogoPath(teamId, seasonId);
   img.onerror = () => (img.style.visibility = "hidden");
   tdLogo.appendChild(img);
 
@@ -1607,7 +1605,7 @@ function gameNumFromMatchId(matchId) {
 
 function teamLogoUrl(seasonId, teamId) {
   if (!teamId) return "";
-  return `logos/${seasonId}/${teamId}.png`;
+  return getLogoPath(teamId, seasonId);
 }
 
 function boxscoreHref(seasonId, matchId){

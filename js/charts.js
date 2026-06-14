@@ -1,6 +1,6 @@
 // js/charts.js
 import { loadCSV, toNumMaybe, toIntMaybe, truthy01 } from "./data.js";
-import { initSeasonPicker, getSeasonId, onSeasonChange, withSeason, saveStage, playoffsHaveBegun, applyDefaultStage } from "./season.js";
+import { initSeasonPicker, getSeasonId, onSeasonChange, withSeason, saveStage, playoffsHaveBegun, applyDefaultStage, getDataPath, getLogoPath } from "./season.js";
 
 /* ---------------------------
    DOM
@@ -533,12 +533,12 @@ function buildColorDropdown(selectEl, scope, advOn, hasBox){
 async function getSeasonData(seasonId){
   if (cache.has(seasonId)) return cache.get(seasonId);
 
-  const teamsPath = `../data/${seasonId}/teams.csv`;
-  const schedPath = `../data/${seasonId}/schedule.csv`;
-  const gamesPath = `../data/${seasonId}/games.csv`;
-  const pRegPath  = `../data/${seasonId}/players.csv`;
-  const pPOPath   = `../data/${seasonId}/players_playoffs.csv`;
-  const boxPath   = `../data/${seasonId}/boxscores.csv`;
+  const teamsPath = getDataPath("teams.csv", seasonId);
+  const schedPath = getDataPath("schedule.csv", seasonId);
+  const gamesPath = getDataPath("games.csv", seasonId);
+  const pRegPath  = getDataPath("players.csv", seasonId);
+  const pPOPath   = getDataPath("players_playoffs.csv", seasonId);
+  const boxPath   = getDataPath("boxscores.csv", seasonId);
 
   const [teams, schedule, games, playersReg, playersPO, boxscores] = await Promise.all([
     loadCSV(teamsPath).catch(()=>[]),

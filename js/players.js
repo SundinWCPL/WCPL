@@ -1,5 +1,5 @@
 import { loadCSV, toIntMaybe, toNumMaybe } from "./data.js";
-import { initSeasonPicker, getSeasonId, onSeasonChange, saveStage, playoffsHaveBegun, applyDefaultStage } from "./season.js";
+import { initSeasonPicker, getSeasonId, onSeasonChange, saveStage, playoffsHaveBegun, applyDefaultStage, getDataPath, getLogoPath } from "./season.js";
 
 const elSeason = document.getElementById("seasonSelect");
 const elStatus = document.getElementById("status");
@@ -217,7 +217,7 @@ function per15WithToi(total, toi) {
 
 async function refresh() {
   const seasonId = getSeasonId();
-  const schedPath = `../data/${seasonId}/schedule.csv`;
+  const schedPath = getDataPath("schedule.csv", seasonId);
   if (!seasonId) {
     setLoading(true, "No season found in seasons.csv.");
     return;
@@ -227,10 +227,10 @@ async function refresh() {
 
   try {
     const seasonsPath = `../data/seasons.csv`;
-    const teamsPath = `../data/${seasonId}/teams.csv`;
+    const teamsPath = getDataPath("teams.csv", seasonId);
 
-    const regularPlayersPath = `../data/${seasonId}/players.csv`;
-    const playoffPlayersPath = `../data/${seasonId}/players_playoffs.csv`;
+    const regularPlayersPath = getDataPath("players.csv", seasonId);
+    const playoffPlayersPath = getDataPath("players_playoffs.csv", seasonId);
 
     // Load seasons + teams first (needed for filters + theming)
     [seasons, teams] = await Promise.all([
@@ -276,9 +276,7 @@ for (const s of schedule) {
       ? playoffPlayersPath
       : regularPlayersPath;
 	  
-	  	const boxscoresPath = (stage === "PO" && hasPlayoffs)
-  ? `../data/${seasonId}/boxscores_playoffs.csv`
-  : `../data/${seasonId}/boxscores.csv`;
+	  	const boxscoresPath = getDataPath("boxscores.csv", seasonId);
 
     // Now load players
 [players, boxscores] = await Promise.all([
@@ -591,7 +589,7 @@ const gsaxDisp = (rateMode === "P15") ? per15WithToi(gsax, gkToi) : gsax;
       img.style.visibility = "hidden";
     } else {
       img.alt = `${r.team_id} logo`;
-      img.src = `../logos/${seasonId}/${r.team_id}.png`;
+      img.src = getLogoPath(r.team_id, seasonId);
       img.onerror = () => (img.style.visibility = "hidden");
     }
 

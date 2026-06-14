@@ -1,6 +1,6 @@
 // js/standings.js
 import { loadCSV, toIntMaybe } from "./data.js";
-import { initSeasonPicker, getSeasonId, onSeasonChange } from "./season.js";
+import { initSeasonPicker, getSeasonId, onSeasonChange, getDataPath, getLogoPath } from "./season.js";
 
 const elSeason = document.getElementById("seasonSelect");
 const elStatus = document.getElementById("status");
@@ -31,9 +31,9 @@ async function refresh() {
   setLoading(true, `Loading ${seasonId}…`);
 
   try {
-    const teamsPath = `../data/${seasonId}/teams.csv`;
-    const gamesPath = `../data/${seasonId}/games.csv`;
-    const schedPath = `../data/${seasonId}/schedule.csv`;
+    const teamsPath = getDataPath("teams.csv", seasonId);
+    const gamesPath = getDataPath("games.csv", seasonId);
+    const schedPath = getDataPath("schedule.csv", seasonId);
 
     teamRows = await loadCSV(teamsPath);
     const games = await loadCSV(gamesPath);
@@ -215,7 +215,7 @@ function render() {
     img.className = "logo";
     img.alt = `${r.team_id} logo`;
     img.loading = "lazy";
-    img.src = `../logos/${seasonId}/${r.team_id}.png`;
+    img.src = getLogoPath(r.team_id, seasonId);
     img.onerror = () => (img.style.visibility = "hidden");
 
     tdLogo.appendChild(img);

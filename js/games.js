@@ -1,6 +1,6 @@
 // js/games.js
 import { loadCSV, toIntMaybe } from "./data.js";
-import { initSeasonPicker, getSeasonId, onSeasonChange, saveStage, playoffsHaveBegun, applyDefaultStage } from "./season.js";
+import { initSeasonPicker, getSeasonId, onSeasonChange, saveStage, playoffsHaveBegun, applyDefaultStage, getDataPath, getLogoPath } from "./season.js";
 
 const elSeason = document.getElementById("seasonSelect");
 const elStatus = document.getElementById("status");
@@ -64,7 +64,7 @@ async function refresh() {
   setLoading(true, `Loading ${seasonId}…`);
 
   try {
-    teams = await loadCSV(`../data/${seasonId}/teams.csv`);
+    teams = await loadCSV(getDataPath("teams.csv", seasonId));
 populateTeamFilter();
 
 // Preselect team filter from URL (?team=WEST) if present
@@ -85,10 +85,10 @@ if (teamFromUrl && elTeamFilter) {
 }
 
 
-scheduleRows = await loadCSV(`../data/${seasonId}/schedule.csv`);
+scheduleRows = await loadCSV(getDataPath("schedule.csv", seasonId));
 
     try {
-      gamesRows = await loadCSV(`../data/${seasonId}/games.csv`);
+      gamesRows = await loadCSV(getDataPath("games.csv", seasonId));
     } catch {
       gamesRows = [];
     }
@@ -554,7 +554,7 @@ if (stage === "as") {
   img.alt = `${team.team_id} logo`;
   img.loading = "lazy";
   img.src =
-    `../logos/${seasonId}/${team.team_id}.png`;
+    getLogoPath(team.team_id, seasonId);
 
   img.onerror = () =>
     (img.style.visibility = "hidden");

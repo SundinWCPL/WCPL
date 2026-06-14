@@ -1,6 +1,6 @@
 // js/boxscore.js
 import { loadCSV, toIntMaybe, toNumMaybe } from "./data.js";
-import { initSeasonPicker, getSeasonId, onSeasonChange } from "./season.js";
+import { initSeasonPicker, getSeasonId, onSeasonChange, getDataPath, getLogoPath } from "./season.js";
 
 const elSeason = document.getElementById("seasonSelect");
 const elStatus = document.getElementById("status");
@@ -66,17 +66,17 @@ async function refresh() {
   try {
     [seasons, teams, schedule] = await Promise.all([
       loadCSV(`../data/seasons.csv`),
-      loadCSV(`../data/${seasonId}/teams.csv`),
-      loadCSV(`../data/${seasonId}/schedule.csv`),
+      loadCSV(getDataPath("teams.csv", seasonId)),
+      loadCSV(getDataPath("schedule.csv", seasonId)),
     ]);
 
-    try { games = await loadCSV(`../data/${seasonId}/games.csv`); }
+    try { games = await loadCSV(getDataPath("games.csv", seasonId)); }
     catch { games = []; }
 
     // Load preview players (reg vs playoffs) later once we know stage.
 
     // Boxscores (optional)
-    try { boxscores = await loadCSV(`../data/${seasonId}/boxscores.csv`); }
+    try { boxscores = await loadCSV(getDataPath("boxscores.csv", seasonId)); }
     catch { boxscores = []; }
 
     const seasonRow = seasons.find(s => String(s.season_id ?? "").trim() === seasonId);
@@ -141,11 +141,11 @@ if (!played) {
   let regPlayers = [];
   let playoffPlayers = [];
 
-  try { regPlayers = await loadCSV(`../data/${seasonId}/players.csv`); }
+  try { regPlayers = await loadCSV(getDataPath("players.csv", seasonId)); }
   catch { regPlayers = []; }
 
   if (stage !== "reg") {
-    try { playoffPlayers = await loadCSV(`../data/${seasonId}/players_playoffs.csv`); }
+    try { playoffPlayers = await loadCSV(getDataPath("players_playoffs.csv", seasonId)); }
     catch { playoffPlayers = []; }
   }
 
@@ -178,8 +178,8 @@ if (!played) {
 // Load players for linking boxscore names
 const playersPath =
   (stage === "reg")
-    ? `../data/${seasonId}/players.csv`
-    : `../data/${seasonId}/players_playoffs.csv`;
+    ? getDataPath("players.csv", seasonId)
+    : getDataPath("players_playoffs.csv", seasonId);
 
 try { players = await loadCSV(playersPath); }
 catch { players = []; }
@@ -788,7 +788,7 @@ function displayTeamName(t) {
 }
 
 function teamLogoUrl(seasonId, teamId) {
-  return `../logos/${seasonId}/${encodeURIComponent(teamId)}.png`;
+  return getLogoPath(teamId, seasonId);
 }
 
 function setTableHeader(tableEl, labels) {

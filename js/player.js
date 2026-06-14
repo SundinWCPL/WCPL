@@ -1,5 +1,5 @@
 import { loadCSV, toIntMaybe, toNumMaybe } from "./data.js";
-import { initSeasonPicker, getSeasonId, onSeasonChange, saveStage, playoffsHaveBegun, applyDefaultStage } from "./season.js";
+import { initSeasonPicker, getSeasonId, onSeasonChange, saveStage, playoffsHaveBegun, applyDefaultStage, getDataPath, getLogoPath } from "./season.js";
 
 const elSeason = document.getElementById("seasonSelect");
 const elStatus = document.getElementById("status");
@@ -217,7 +217,7 @@ async function computeCareerRoleSplitFromAllSeasons(seasonsMeta, stage, pSeason)
 
     // ---- CASE 1: Modern season (has boxscores) ----
     if (advThisSeason) {
-const schedPath = `../data/${sid}/schedule.csv`;
+const schedPath = getDataPath("schedule.csv", sid);
 const seasonSchedule = await loadCSV(schedPath).catch(() => []);
 const boxRows = await loadStageBoxscores(sid, stage, seasonSchedule).catch(() => []);
 if (!boxRows.length) continue;
@@ -228,7 +228,7 @@ const split = computeRoleSplitFromBoxscores(boxRows, pSeason);
 
     // ---- CASE 2: Legacy season (S1) ----
     else {
-      const playersPath = `../data/${sid}/players.csv`;
+      const playersPath = getDataPath("players.csv", sid);
       const rows = await loadCSV(playersPath).catch(() => null);
       if (!rows) continue;
 
@@ -264,7 +264,7 @@ function rowMatchesStage(matchId, stage, schedById) {
 }
 
 async function loadStageBoxscores(seasonId, stage, scheduleRows) {
-  const allRows = await loadCSV(`../data/${seasonId}/boxscores.csv`).catch(() => []);
+  const allRows = await loadCSV(getDataPath("boxscores.csv", seasonId)).catch(() => []);
   const schedById = new Map((scheduleRows || []).map(s => [String(s.match_id ?? "").trim(), s]));
   return allRows.filter(r => rowMatchesStage(r.match_id, stage, schedById));
 }
@@ -284,14 +284,14 @@ async function refresh() {
 
   try {
     const seasonsPath = `../data/seasons.csv`;
-    const teamsPath = `../data/${seasonId}/teams.csv`;
-    const regularPlayersPath = `../data/${seasonId}/players.csv`;
-    const playoffPlayersPath = `../data/${seasonId}/players_playoffs.csv`;
+    const teamsPath = getDataPath("teams.csv", seasonId);
+    const regularPlayersPath = getDataPath("players.csv", seasonId);
+    const playoffPlayersPath = getDataPath("players_playoffs.csv", seasonId);
 
     // Enable/disable playoffs option (for current season)
     const hasPlayoffsThisSeason = await urlExists(playoffPlayersPath);
     setPlayoffsOptionEnabled(hasPlayoffsThisSeason);
-const schedPath = `../data/${seasonId}/schedule.csv`;
+const schedPath = getDataPath("schedule.csv", seasonId);
 const schedule = await loadCSV(schedPath).catch(() => []);
 
 let playoffsBegun = false;
@@ -391,8 +391,8 @@ async function computeCareerAgg(seasons, playerKey, stage) {
 
   const paths = await Promise.all(seasonIds.map(async sid => {
     const path = stage === "PO"
-      ? `../data/${sid}/players_playoffs.csv`
-      : `../data/${sid}/players.csv`;
+      ? getDataPath("players_playoffs.csv", sid)
+      : getDataPath("players.csv", sid);
 
     const ok = await urlExists(path);
     return ok ? path : null;
@@ -529,7 +529,7 @@ function renderHero(seasonId, p, team) {
   }
 
   if (teamId) {
-    elLogo.src = `../logos/${seasonId}/${teamId}.png`;
+    elLogo.src = getLogoPath(teamId, seasonId);
     elLogo.alt = `${teamId} logo`;
     elLogo.style.visibility = "visible";
     elLogo.onerror = () => (elLogo.style.visibility = "hidden");

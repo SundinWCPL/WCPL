@@ -114,16 +114,16 @@ async function refresh() {
   }
 
   try {
-    const teamsPath = `../data/${seasonId}/teams.csv`;
-    const gamesPath = `../data/${seasonId}/games.csv`;
-    const schedPath = `../data/${seasonId}/schedule.csv`;
+    const teamsPath = getDataPath("teams.csv", seasonId);
+    const gamesPath = getDataPath("games.csv", seasonId);
+    const schedPath = getDataPath("schedule.csv", seasonId);
 
     teams = await loadCSV(teamsPath);
     const games = await loadCSV(gamesPath);
     const schedule = await loadCSV(schedPath);
 	
 	let boxscores = [];
-	try { boxscores = await loadCSV(`../data/${seasonId}/boxscores.csv`); }
+	try { boxscores = await loadCSV(getDataPath("boxscores.csv", seasonId)); }
 	catch { boxscores = []; }
 
     setPlayoffsOptionEnabled(hasAnyPlayoffs(schedule));
@@ -547,7 +547,7 @@ const per15 = (n) => {
   img.className = "logo";
   img.alt = `${r.team_name} logo`;
   img.loading = "lazy";
-  img.src = `../logos/${seasonId}/${r.team_id}.png`;
+  img.src = getLogoPath(r.team_id, seasonId);
   img.onerror = () => (img.style.visibility = "hidden");
   tdLogo.appendChild(img);
 

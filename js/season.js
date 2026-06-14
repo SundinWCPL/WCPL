@@ -1,25 +1,28 @@
 // js/season.js
 import { loadCSV, truthy01 } from "./data.js";
 
-const SEASONS_PATH = new URL(
-  (window.location.pathname.includes("/pages/") ? "../data/" : "data/") + "seasons.csv",
-  window.location.href
-).toString();
+function dataBase() {
+  const path = window.location.pathname || "";
+  return path.includes("/pages/") ? "../data" : "data";
+}
 
-const LS_KEY = "wcpl_season"; // NEW: remember last picked season
+function seasonsPath() {
+  return new URL(`${dataBase()}/seasons.csv`, window.location.href).toString();
+}
+
+const LS_KEY = "wcpl_season";
+const LS_DIVISION_KEY_PREFIX = "wcpl_division_";
 
 let seasons = [];
+let divisions = [];
 let currentSeasonId = null;
+let currentDivisionId = null;
+let divisionSelectEl = null;
 const listeners = new Set();
 
 export async function initSeasonPicker(selectEl) {
-  seasons = await loadCSV(SEASONS_PATH);
+  seasons = await loadCSV(seasonsPath());
 
-  // Determine initial season:
-  // 1) URL ?season=S1
-  // 2) localStorage last choice
-  // 3) first is_active=1
-  // 4) first row
   const urlSeason = getUrlParam("season");
   const savedSeason = getSavedSeason();
   const active = seasons.find(s => truthy01(s.is_active));
@@ -30,7 +33,6 @@ export async function initSeasonPicker(selectEl) {
     (savedSeason && seasons.some(s => s.season_id === savedSeason)) ? savedSeason :
     (active?.season_id ?? first?.season_id ?? null);
 
-  // Populate select
   selectEl.innerHTML = "";
   for (const s of seasons) {
     const opt = document.createElement("option");
@@ -41,24 +43,133 @@ export async function initSeasonPicker(selectEl) {
 
   if (currentSeasonId) selectEl.value = currentSeasonId;
 
-  // Keep URL + localStorage in sync
+  await initDivisionPicker(selectEl);
+
   if (currentSeasonId) {
     setUrlParam("season", currentSeasonId);
     saveSeason(currentSeasonId);
   }
+  syncDivisionUrl();
 
-  selectEl.addEventListener("change", () => {
+  selectEl.addEventListener("change", async () => {
     const next = selectEl.value;
     if (!next || next === currentSeasonId) return;
     currentSeasonId = next;
     setUrlParam("season", currentSeasonId);
-    saveSeason(currentSeasonId); // NEW
+    saveSeason(currentSeasonId);
+    await initDivisionPicker(selectEl);
+    syncDivisionUrl();
     notify();
   });
 }
 
+async function initDivisionPicker(seasonSelectEl) {
+  divisions = await loadDivisions(currentSeasonId);
+
+  if (!divisionSelectEl) {
+    divisionSelectEl = document.getElementById("divisionSelect");
+  }
+
+  if (!divisionSelectEl && divisions.length) {
+    divisionSelectEl = document.createElement("select");
+    divisionSelectEl.id = "divisionSelect";
+    divisionSelectEl.className = seasonSelectEl.className || "";
+    divisionSelectEl.title = "Division";
+    divisionSelectEl.style.marginLeft = "8px";
+    seasonSelectEl.insertAdjacentElement("afterend", divisionSelectEl);
+
+    divisionSelectEl.addEventListener("change", () => {
+      const next = divisionSelectEl.value;
+      if (!next || next === currentDivisionId) return;
+      currentDivisionId = next;
+      saveDivision(currentSeasonId, currentDivisionId);
+      syncDivisionUrl();
+      notify();
+    });
+  }
+
+  if (!divisionSelectEl) {
+    currentDivisionId = null;
+    return;
+  }
+
+  if (!divisions.length) {
+    currentDivisionId = null;
+    divisionSelectEl.hidden = true;
+    divisionSelectEl.innerHTML = "";
+    return;
+  }
+
+  const urlDivision = getUrlParam("division");
+  const savedDivision = getSavedDivision(currentSeasonId);
+  const first = divisions[0];
+
+  currentDivisionId =
+    (urlDivision && divisions.some(d => d.division_id === urlDivision)) ? urlDivision :
+    (savedDivision && divisions.some(d => d.division_id === savedDivision)) ? savedDivision :
+    (first?.division_id ?? null);
+
+  divisionSelectEl.innerHTML = "";
+  for (const d of divisions) {
+    const opt = document.createElement("option");
+    opt.value = d.division_id;
+    opt.textContent = d.division_name || d.division_id;
+    divisionSelectEl.appendChild(opt);
+  }
+
+  if (currentDivisionId) {
+    divisionSelectEl.value = currentDivisionId;
+    saveDivision(currentSeasonId, currentDivisionId);
+  }
+  divisionSelectEl.hidden = false;
+}
+
+async function loadDivisions(seasonId) {
+  if (!seasonId) return [];
+  const path = `${dataBase()}/${seasonId}/divisions.csv`;
+  try {
+    const rows = await loadCSV(path);
+    return rows
+      .map(r => ({
+        division_id: String(r.division_id ?? "").trim(),
+        division_name: String(r.division_name ?? r.name ?? "").trim()
+      }))
+      .filter(r => r.division_id);
+  } catch {
+    return [];
+  }
+}
+
 export function getSeasonId() {
   return currentSeasonId;
+}
+
+export function getDivisionId() {
+  return currentDivisionId;
+}
+
+export function hasDivisions() {
+  return !!currentDivisionId;
+}
+
+export function getDataPath(fileName, seasonId = currentSeasonId, divisionId = currentDivisionId) {
+  if (!seasonId) return `${dataBase()}/${fileName}`;
+  const clean = String(fileName ?? "").replace(/^\/+/, "");
+
+  // Division folders only apply to the currently selected season.
+  // This keeps career aggregation from accidentally looking for old seasons at
+  // data/S1/D1/... or data/S2/D1/... while viewing S3/D1.
+  const useDivision = divisionId && String(seasonId) === String(currentSeasonId);
+
+  return useDivision
+    ? `${dataBase()}/${seasonId}/${divisionId}/${clean}`
+    : `${dataBase()}/${seasonId}/${clean}`;
+}
+
+export function getLogoPath(teamId, seasonId = currentSeasonId) {
+  const cleanTeam = encodeURIComponent(String(teamId ?? "").trim());
+  const prefix = (window.location.pathname || "").includes("/pages/") ? "../logos" : "logos";
+  return `${prefix}/${seasonId}/${cleanTeam}.png`;
 }
 
 export function onSeasonChange(cb) {
@@ -66,16 +177,17 @@ export function onSeasonChange(cb) {
   return () => listeners.delete(cb);
 }
 
-// NEW: helper to stamp season onto links
-export function withSeason(href, seasonId = currentSeasonId) {
+export function withSeason(href, seasonId = currentSeasonId, divisionId = currentDivisionId) {
   if (!seasonId) return href;
   const url = new URL(href, window.location.href);
   url.searchParams.set("season", seasonId);
+  if (divisionId) url.searchParams.set("division", divisionId);
+  else url.searchParams.delete("division");
   return url.pathname + url.search;
 }
 
 function notify() {
-  for (const cb of listeners) cb(currentSeasonId);
+  for (const cb of listeners) cb(currentSeasonId, currentDivisionId);
 }
 
 function getUrlParam(key) {
@@ -90,12 +202,24 @@ function setUrlParam(key, val) {
   window.history.replaceState({}, "", url);
 }
 
-// NEW localStorage helpers
+function syncDivisionUrl() {
+  if (currentDivisionId) setUrlParam("division", currentDivisionId);
+  else setUrlParam("division", null);
+}
+
 function getSavedSeason() {
   try { return localStorage.getItem(LS_KEY); } catch { return null; }
 }
 function saveSeason(seasonId) {
   try { localStorage.setItem(LS_KEY, seasonId); } catch {}
+}
+function getSavedDivision(seasonId) {
+  if (!seasonId) return null;
+  try { return localStorage.getItem(LS_DIVISION_KEY_PREFIX + seasonId); } catch { return null; }
+}
+function saveDivision(seasonId, divisionId) {
+  if (!seasonId || !divisionId) return;
+  try { localStorage.setItem(LS_DIVISION_KEY_PREFIX + seasonId, divisionId); } catch {}
 }
 // --- Stage (REG/PO) helpers ---------------------------------------------
 
