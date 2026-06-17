@@ -1126,7 +1126,8 @@ function creaseClosedPath(cx, cz, r, steps = 48) {
 
   // Split: goals vs on-net
   const goals = events.filter(e => (e.result || "").toUpperCase() === "G");
-  const onNet = events.filter(e => (e.result || "").toUpperCase() !== "G");
+  const saves = events.filter(e => (e.result || "").toUpperCase() === "S");
+  const misses = events.filter(e => (e.result || "").toUpperCase() === "M");
 
 const nameFromSteam = (steamId) => {
   const key = normalizeId(steamId);
@@ -1162,6 +1163,10 @@ if (String(e.shotKind || "").toLowerCase() === "bat") {
   typeLine = "Bat/Tip";
 }
 
+if ((e.result || "").toUpperCase() === "M") {
+  typeLine = `Missed ${typeLine}`;
+}
+
 const contactSpeed = (e.contactV != null && Number.isFinite(e.contactV))
   ? (e.contactV * SPEED_MULT).toFixed(1)
   : "";
@@ -1169,41 +1174,56 @@ const contactSpeed = (e.contactV != null && Number.isFinite(e.contactV))
 
   const speedLabel = "From Stick";
 
-const heightLabel = (String(e.result || "").toUpperCase() === "G")
-  ? "At Goal Line"
-  : "At Save";
+let heightLabel = "At Save";
+
+if ((e.result || "").toUpperCase() === "G") {
+  heightLabel = "At Goal Line";
+}
 
 const xgStr = (e.xg != null && Number.isFinite(e.xg)) ? e.xg.toFixed(2) : "";
 
-return [
-  player,
-  String(e.t || ""),
-  Number.isFinite(dist) ? dist.toFixed(1) : "",
-  typeLine,
-  speedLabel,
-  heightLabel,
-  contactSpeed,
-  contactY,
-  xgStr
-];
+const isMiss = (String(e.result || "").toUpperCase() === "M");
+
+let tooltip =
+  `<b>${escapeHtml(player)}</b><br>` +
+  `${escapeHtml(String(e.t || ""))}<br>` +
+  `Distance: ${Number.isFinite(dist) ? dist.toFixed(1) : ""} m<br>` +
+  `Type: ${escapeHtml(typeLine)}<br>` +
+  `Speed (${escapeHtml(speedLabel)}): ${escapeHtml(contactSpeed)} ${SPEED_UNIT}<br>`;
+
+if (!isMiss) {
+  tooltip += `Puck Height (${escapeHtml(heightLabel)}): ${escapeHtml(contactY)} m<br>`;
+}
+
+tooltip += `xG: ${escapeHtml(xgStr)}`;
+
+return [tooltip];
 
 }),
-hovertemplate:
-  "<b>%{customdata[0]}</b><br>" +
-  "%{customdata[1]}<br>" +
-  "Distance: %{customdata[2]} m<br>" +
-  "Type: %{customdata[3]}<br>" +
-  "Speed (%{customdata[4]}): %{customdata[6]} " + SPEED_UNIT + "<br>" +
-  "Puck Height (%{customdata[5]}): %{customdata[7]} m<br>" +
-  "xG: %{customdata[8]}<br>" +
-  "<extra></extra>",
+hovertemplate: "%{customdata[0]}<extra></extra>",
     marker
   });
 
-  const data = [
-    makeTrace(onNet, "On Net", { size: 9, opacity: 0.85, line: { width: 1 } }),
-    makeTrace(goals, "Goal",  { size: 13, opacity: 0.95, line: { width: 1 } }),
-  ];
+const data = [
+  makeTrace(saves, "On Net", {
+    size: 9,
+    opacity: 0.85,
+    line: { width: 1 }
+  }),
+
+  makeTrace(misses, "Missed", {
+    size: 9,
+    color: "#d62728",
+    opacity: 0.85,
+    line: { width: 1 }
+  }),
+
+  makeTrace(goals, "Goal", {
+    size: 13,
+    opacity: 0.95,
+    line: { width: 1 }
+  }),
+];
 const PAD_X = 1; // meters – visual padding past boards
   const layout = {
     title: null,
