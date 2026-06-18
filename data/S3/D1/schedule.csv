@@ -1,7 +1,7 @@
 match_id,week,home_team_id,away_team_id,stage,status,imported_on
-M1-G1,1,TOR,BCL,reg,Scheduled,
-M1-G2,1,TOR,BCL,reg,Scheduled,
-M1-G3,1,TOR,BCL,reg,Scheduled,
+M1-G1,1,TOR,BCL,reg,final,2026-06-17
+M1-G2,1,TOR,BCL,reg,final,2026-06-17
+M1-G3,1,TOR,BCL,reg,final,2026-06-17
 M2-G1,1,SEA,LL,reg,Scheduled,
 M2-G2,1,SEA,LL,reg,Scheduled,
 M2-G3,1,SEA,LL,reg,Scheduled,

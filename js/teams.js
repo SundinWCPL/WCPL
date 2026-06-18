@@ -6,7 +6,9 @@ import {
   onSeasonChange,
   saveStage,
   playoffsHaveBegun,
-  applyDefaultStage
+  applyDefaultStage,
+  getDataPath,
+  getLogoPath
 } from "./season.js";
 
 const elSeason = document.getElementById("seasonSelect");
