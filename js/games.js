@@ -136,12 +136,12 @@ function dateKey(s) {
   const v = String(s ?? "").trim();
   if (!v) return NaN;
 
-  // schedule.csv / games.csv imported_on is expected YYYY-MM-DD
-  const [yyyy, mm, dd] = v.split("-").map(Number);
-  if (!yyyy || !mm || !dd) return NaN;
+  // Supports YYYY-MM-DD and YYYY-MM-DD HH:mm / YYYY-MM-DDTHH:mm.
+  const m = v.match(/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{1,2}):(\d{2}))?/);
+  if (!m) return NaN;
 
-  // Numeric key for easy compare (2026-02-14 -> 20260214)
-  return (yyyy * 10000) + (mm * 100) + dd;
+  const [, yyyy, mm, dd, hh = "0", min = "0"] = m;
+  return new Date(Number(yyyy), Number(mm) - 1, Number(dd), Number(hh), Number(min)).getTime();
 }
 
 function getUrlParam(key) {
@@ -578,19 +578,25 @@ function fallbackTeam(team_id) {
 }
 
 function formatDate(s) {
-  const v = (s ?? "").trim();
+  const v = String(s ?? "").trim();
   if (!v) return "";
 
-  // Expect YYYY-MM-DD
-  const [yyyy, mm, dd] = v.split("-").map(Number);
-  if (!yyyy || !mm || !dd) return v;
+  // Supports YYYY-MM-DD and YYYY-MM-DD HH:mm / YYYY-MM-DDTHH:mm.
+  const m = v.match(/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{1,2}):(\d{2}))?/);
+  if (!m) return v;
 
-  const d = new Date(yyyy, mm - 1, dd); // LOCAL date constructor
+  const [, yyyy, mm, dd, hh, min] = m;
+  const hasTime = hh !== undefined && min !== undefined;
+  const d = new Date(Number(yyyy), Number(mm) - 1, Number(dd), hasTime ? Number(hh) : 0, hasTime ? Number(min) : 0);
 
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
+  if (!hasTime) {
+    const y = d.getFullYear();
+    const m2 = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m2}-${day}`;
+  }
+
+  return d.toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 }
 
 function setLoading(isLoading, msg = "") {

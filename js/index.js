@@ -354,7 +354,9 @@ card.appendChild(buildSchedTeamRow(seasonId, it.home, it.homeTeam, it.played ? i
   foot.className = "sched-foot";
 
   if (!it.played) {
-    foot.textContent = "Scheduled";
+    foot.textContent = it.imported_on
+      ? `Scheduled: ${formatScheduleDateTime(it.imported_on)}`
+      : "Scheduled";
   } else {
     const base = (it.ot > 0) ? "Final (OT)" : "Final";
 
@@ -366,6 +368,26 @@ card.appendChild(buildSchedTeamRow(seasonId, it.home, it.homeTeam, it.played ? i
 
   card.appendChild(foot);
   return card;
+}
+
+
+function formatScheduleDateTime(value) {
+  const v = String(value ?? "").trim();
+  if (!v) return "";
+
+  // Supports YYYY-MM-DD and YYYY-MM-DD HH:mm / YYYY-MM-DDTHH:mm.
+  const m = v.match(/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{1,2}):(\d{2}))?/);
+  if (!m) return v;
+
+  const [, yyyy, mm, dd, hh, min] = m;
+  const hasTime = hh !== undefined && min !== undefined;
+  const d = new Date(Number(yyyy), Number(mm) - 1, Number(dd), hasTime ? Number(hh) : 0, hasTime ? Number(min) : 0);
+
+  const opts = hasTime
+    ? { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }
+    : { month: "short", day: "numeric" };
+
+  return d.toLocaleString(undefined, opts);
 }
 
 /* ----------------------------- series cards ----------------------------- */
@@ -546,8 +568,11 @@ cell.appendChild(gLabel);
   const foot = document.createElement("div");
   foot.className = "sched-foot";
 
-  if (!allPlayed) {
-    foot.textContent = "Scheduled";
+if (!allPlayed) {
+  const scheduledItem = seriesItems.find(x => !x.played && String(x.imported_on ?? "").trim());
+  foot.textContent = scheduledItem
+    ? `Scheduled: ${formatScheduleDateTime(scheduledItem.imported_on)}`
+    : "Scheduled";
 } else {
   const st = String(first.stage ?? "").toLowerCase();
 
