@@ -53,6 +53,37 @@ async function urlExists(url){
   }
 }
 
+async function loadDivisionPlayoffOverrides(seasonId) {
+  const seasonRoot = String(seasonId ?? "").match(/^S\d+/i)?.[0] ?? seasonId;
+
+  const paths = [
+    `${dataBase()}/${seasonId}/divisions.csv`,
+    `${dataBase()}/${seasonRoot}/divisions.csv`,
+  ];
+
+  for (const divisionsPath of paths) {
+    try {
+      const rows = await loadCSV(divisionsPath);
+      const map = new Map();
+
+      for (const r of rows) {
+        const divisionId = String(r.division_id ?? "").trim().toUpperCase();
+        const spots = toIntMaybe(r.playoff_teams_per_conf);
+
+        if (divisionId && spots !== null) {
+          map.set(divisionId, spots);
+        }
+      }
+
+      if (map.size) return map;
+    } catch {
+      // try next path
+    }
+  }
+
+  return new Map();
+}
+
 function setPlayoffsOptionEnabled(ok){
   const opt = [...elStage.options].find(o => o.value === "PO");
   if (!opt) return;
@@ -101,18 +132,37 @@ const hasPlayoffsPlayers = await urlExists(playoffPlayersPath);
 setPlayoffsOptionEnabled(hasPlayoffsPlayers);
 
 // Load the "always needed" CSVs first (teams, games, schedule, seasons)
-const [seasons, tRows, gRows, sRows] = await Promise.all([
+const [seasons, tRows, gRows, sRows, divisionPlayoffOverrides] = await Promise.all([
   loadCSV(seasonsPath),
   loadCSV(teamsPath),
   loadCSV(gamesPath),
   loadCSV(schedPath),
+  loadDivisionPlayoffOverrides(seasonId),
 ]);
 
 const seasonRow =
   seasons.find(r => String(r.season_id ?? "").trim() === seasonId) ?? null;
 
+const divisionIdFromTeams =
+  String(tRows.find(t => String(t.division_id ?? "").trim())?.division_id ?? "").trim().toUpperCase();
+
+const divisionIdFromSeason =
+  String(seasonRow?.division_id ?? "").trim().toUpperCase();
+
+const divisionIdFromSeasonId =
+  String(seasonId ?? "").match(/D\d+/i)?.[0]?.toUpperCase() ?? "";
+
+const divisionIdFromTeamsPath =
+  String(teamsPath ?? "").match(/[\/\\](D\d+)[\/\\]/i)?.[1]?.toUpperCase() ?? "";
+
+const divisionId =
+  divisionIdFromTeams || divisionIdFromSeason || divisionIdFromSeasonId || divisionIdFromTeamsPath;
+
+const divisionOverride =
+  divisionId ? divisionPlayoffOverrides.get(divisionId) : null;
+
 currentSeasonSettings.playoffTeamsPerConf =
-  Math.max(0, toIntMaybe(seasonRow?.playoff_teams_per_conf) ?? 0);
+  Math.max(0, divisionOverride ?? toIntMaybe(seasonRow?.playoff_teams_per_conf) ?? 0);
 
 // Now we can detect whether playoffs have begun
 const playoffsBegun = playoffsHaveBegun(sRows, gRows);
@@ -883,21 +933,13 @@ for (const r of tmap.values()) {
     a.localeCompare(b, undefined, { sensitivity: "base" })
   );
   
-  // If we have 2 conferences, force the home layout to stay 2-column (Standings + Leaders)
-const page = document.getElementById("pageBody"); // <main ... id="pageBody">
-if (page) page.classList.toggle("home-wide", confs.length === 2);
+// Always stack conference standings vertically on the home page.
+// League Leaders already sits beside standings, so side-by-side conferences get too cramped.
+const page = document.getElementById("pageBody");
+if (page) page.classList.remove("home-wide");
 
-  const isTwoConf = (confs.length === 2);
-
-// existing toggle for the mini grid
-elWrap.classList.toggle("two-col", isTwoConf);
-
-// NEW: toggle the layout mode on the parent row
-document.querySelector(".home-two")?.classList.toggle("two-conf", isTwoConf);
-
-
-  // Toggle 2-col layout if exactly two conferences
-  elWrap.classList.toggle("two-col", confs.length === 2);
+elWrap.classList.remove("two-col");
+document.querySelector(".home-two")?.classList.remove("two-conf");
 
   // Render
   elWrap.innerHTML = "";
@@ -974,7 +1016,7 @@ if (showClinchMarks) {
 <thead>
   <tr>
     <th></th>
-    <th class="left">Team</th>
+    <th class="left" style="width: 200px;">Team</th>
     <th class="num">GP</th>
     <th class="num">W</th>
     <th class="num">OTW</th>
@@ -1015,6 +1057,10 @@ if (showClinchMarks) {
 // Team link + playoff marker
 const tdTeam = document.createElement("td");
 tdTeam.className = "left";
+tdTeam.style.width = "200px";
+tdTeam.style.minWidth = "200px";
+tdTeam.style.maxWidth = "200px";
+tdTeam.style.whiteSpace = "nowrap";
 
 const teamWrap = document.createElement("div");
 teamWrap.className = "standings-team-wrap";
