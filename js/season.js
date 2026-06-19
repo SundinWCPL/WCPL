@@ -166,10 +166,12 @@ export function getDataPath(fileName, seasonId = currentSeasonId, divisionId = c
     : `${dataBase()}/${seasonId}/${clean}`;
 }
 
+const LOGO_VERSION = "2026-06-19-1";
+
 export function getLogoPath(teamId, seasonId = currentSeasonId) {
   const cleanTeam = encodeURIComponent(String(teamId ?? "").trim());
   const prefix = (window.location.pathname || "").includes("/pages/") ? "../logos" : "logos";
-  return `${prefix}/${seasonId}/${cleanTeam}.png`;
+  return `${prefix}/${seasonId}/${cleanTeam}.png?v=${encodeURIComponent(LOGO_VERSION)}`;
 }
 
 export function onSeasonChange(cb) {
