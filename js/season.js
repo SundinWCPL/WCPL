@@ -166,7 +166,7 @@ export function getDataPath(fileName, seasonId = currentSeasonId, divisionId = c
     : `${dataBase()}/${seasonId}/${clean}`;
 }
 
-const LOGO_VERSION = "2026-06-19-1";
+const LOGO_VERSION = "2026-06-19-2";
 
 export function getLogoPath(teamId, seasonId = currentSeasonId) {
   const cleanTeam = encodeURIComponent(String(teamId ?? "").trim());
