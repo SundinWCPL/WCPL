@@ -553,13 +553,27 @@ const per15 = (n) => {
   img.onerror = () => (img.style.visibility = "hidden");
   tdLogo.appendChild(img);
 
-  // Team link
-  const tdTeam = document.createElement("td");
-  const a = document.createElement("a");
-  a.className = "team-link";
-  a.href = `team.html?season=${encodeURIComponent(seasonId)}&team_id=${encodeURIComponent(r.team_id)}`;
-  a.textContent = r.team_name || r.team_id;
-  tdTeam.appendChild(a);
+// Team link
+const tdTeam = document.createElement("td");
+
+if (r.bg_color) {
+  tdTeam.style.backgroundColor = r.bg_color;
+}
+
+if (r.text_color) {
+  tdTeam.style.color = r.text_color;
+}
+
+const a = document.createElement("a");
+a.className = "team-link";
+a.href = `team.html?season=${encodeURIComponent(seasonId)}&team_id=${encodeURIComponent(r.team_id)}`;
+a.textContent = r.team_name || r.team_id;
+
+if (r.text_color) {
+  a.style.color = r.text_color;
+}
+
+tdTeam.appendChild(a);
 
   // Derived stats
   const gf = r.GF ?? 0;

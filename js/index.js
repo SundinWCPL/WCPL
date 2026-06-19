@@ -1024,6 +1024,15 @@ a.className = "team-link";
 a.href = `pages/team.html?season=${encodeURIComponent(seasonId)}&team_id=${encodeURIComponent(r.team_id)}`;
 a.textContent = r.team_name || r.team_id;
 
+if (r.bg_color) {
+  tdTeam.style.backgroundColor = r.bg_color;
+}
+
+if (r.text_color) {
+  tdTeam.style.color = r.text_color;
+  a.style.color = r.text_color;
+}
+
 teamWrap.appendChild(a);
 
 if (r.playoffMark) {
