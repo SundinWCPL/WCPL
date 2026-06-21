@@ -2,9 +2,9 @@ match_id,week,home_team_id,away_team_id,stage,status,imported_on
 M1-G1,1,LGT,BLM,reg,Scheduled,
 M1-G2,1,LGT,BLM,reg,Scheduled,
 M1-G3,1,LGT,BLM,reg,Scheduled,
-M2-G1,1,CLE,BCK,reg,Scheduled,2026-06-20 21:00
-M2-G2,1,CLE,BCK,reg,Scheduled,2026-06-20 21:00
-M2-G3,1,CLE,BCK,reg,Scheduled,2026-06-20 21:00
+M2-G1,1,BCK,CLE,reg,final,2026-06-20
+M2-G2,1,BCK,CLE,reg,final,2026-06-20
+M2-G3,1,BCK,CLE,reg,final,2026-06-20
 M3-G1,2,RCH,BLD,reg,Scheduled,
 M3-G2,2,RCH,BLD,reg,Scheduled,
 M3-G3,2,RCH,BLD,reg,Scheduled,
