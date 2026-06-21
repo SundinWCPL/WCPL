@@ -2,9 +2,9 @@ match_id,week,home_team_id,away_team_id,stage,status,imported_on
 M1-G1,1,TOR,BCL,reg,final,2026-06-17
 M1-G2,1,TOR,BCL,reg,final,2026-06-17
 M1-G3,1,TOR,BCL,reg,final,2026-06-17
-M2-G1,1,LL,SEA,reg,final,2026-06-20
-M2-G2,1,LL,SEA,reg,final,2026-06-20
-M2-G3,1,LL,SEA,reg,final,2026-06-20
+M2-G1,1,SEA,LL,reg,final,2026-06-20
+M2-G2,1,SEA,LL,reg,final,2026-06-20
+M2-G3,1,SEA,LL,reg,final,2026-06-20
 M3-G1,1,PKN,NK,reg,final,2026-06-20
 M3-G2,1,PKN,NK,reg,final,2026-06-20
 M3-G3,1,PKN,NK,reg,final,2026-06-20
