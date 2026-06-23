@@ -1,7 +1,7 @@
 match_id,week,home_team_id,away_team_id,stage,status,imported_on
-M1-G1,1,VAN,206,reg,Scheduled,
-M1-G2,1,VAN,206,reg,Scheduled,
-M1-G3,1,VAN,206,reg,Scheduled,
+M1-G1,1,VAN,206,reg,Scheduled,2026-06-23 21:00
+M1-G2,1,VAN,206,reg,Scheduled,2026-06-23 21:00
+M1-G3,1,VAN,206,reg,Scheduled,2026-06-23 21:00
 M2-G1,1,VIC,KLN,reg,Scheduled,
 M2-G2,1,VIC,KLN,reg,Scheduled,
 M2-G3,1,VIC,KLN,reg,Scheduled,
