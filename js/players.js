@@ -413,7 +413,24 @@ if (teamId === "FREE_AGENT") {
 
   // --- map/decorate ---
   const rows = view.map(p => {
-	  const roleSplit = getFlexSplitForPlayer(p);
+	  let roleSplit = getFlexSplitForPlayer(p);
+
+// S1 has no per-player boxscores, so S/G players cannot be safely split
+// by role from boxscore rows. Fall back to season-total players.csv stats.
+if (roleSplit) {
+  const splitHasData =
+    (toNumMaybe(roleSplit.skater.g) ?? 0) +
+    (toNumMaybe(roleSplit.skater.a) ?? 0) +
+    (toNumMaybe(roleSplit.skater.shots) ?? 0) +
+    (toNumMaybe(roleSplit.goalie.sa) ?? 0) +
+    (toNumMaybe(roleSplit.goalie.ga) ?? 0) +
+    (toNumMaybe(roleSplit.goalie.wins) ?? 0) +
+    (toNumMaybe(roleSplit.goalie.so) ?? 0) > 0;
+
+  if (!splitHasData) {
+    roleSplit = null;
+  }
+}
 const skToi = roleSplit ? toNumMaybe(roleSplit.skater.toi) : toNumMaybe(p.toi_s ?? p.toi);
 const gkToi = roleSplit ? toNumMaybe(roleSplit.goalie.toi) : toNumMaybe(p.toi_g ?? p.toi);
 const gp_s = toIntMaybe(p.gp_s) ?? 0;

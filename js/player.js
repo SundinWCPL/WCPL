@@ -346,8 +346,22 @@ const s_gp = toIntMaybe(pSeason.gp_s) ?? 0;
 const g_gp = toIntMaybe(pSeason.gp_g) ?? 0;
 
 if (s_gp > 0 && g_gp > 0) {
-const boxRows = await loadStageBoxscores(seasonId, stage, schedule);
-roleSplitSeason = computeRoleSplitFromBoxscores(boxRows, pSeason);
+  const boxRows = await loadStageBoxscores(seasonId, stage, schedule);
+
+  if (boxRows.length > 0) {
+    const split = computeRoleSplitFromBoxscores(boxRows, pSeason);
+
+    const splitHasData =
+      (toNumMaybe(split.skater.g) ?? 0) +
+      (toNumMaybe(split.skater.a) ?? 0) +
+      (toNumMaybe(split.skater.shots) ?? 0) +
+      (toNumMaybe(split.goalie.sa) ?? 0) +
+      (toNumMaybe(split.goalie.ga) ?? 0) +
+      (toNumMaybe(split.goalie.wins) ?? 0) +
+      (toNumMaybe(split.goalie.so) ?? 0) > 0;
+
+    roleSplitSeason = splitHasData ? split : null;
+  }
 }
 
 // Career split (always compute; cheap + prevents flex contamination across seasons)
@@ -1888,7 +1902,9 @@ function computeLeagueMinsFromPlayers(playersRows, role, advOn, boxRows = []) {
     const gpG = Number(p.gp_g ?? 0);
     const isFlex = gpS > 0 && gpG > 0;
 
-    const split = isFlex ? computeRoleSplitFromBoxscores(boxRows, p) : null;
+    const split = (isFlex && boxRows.length > 0)
+  ? computeRoleSplitFromBoxscores(boxRows, p)
+  : null;
     const allVals = readPlayerPer15FromSeasonRow(p, advOn, split);
     if (!allVals) continue;
 
