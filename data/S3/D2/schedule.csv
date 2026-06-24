@@ -14,9 +14,9 @@ M4-G3,2,BLD,LGT,reg,Scheduled,2026-06-26 21:00
 M5-G1,2,RCH,CLE,reg,Scheduled,2026-06-28 21:15
 M5-G2,2,RCH,CLE,reg,Scheduled,2026-06-28 21:15
 M5-G3,2,RCH,CLE,reg,Scheduled,2026-06-28 21:15
-M6-G1,2,BLM,BCK,reg,Scheduled,
-M6-G2,2,BLM,BCK,reg,Scheduled,
-M6-G3,2,BLM,BCK,reg,Scheduled,
+M6-G1,3,BLM,BCK,reg,Scheduled,
+M6-G2,3,BLM,BCK,reg,Scheduled,
+M6-G3,3,BLM,BCK,reg,Scheduled,
 M7-G1,3,CLE,BLD,reg,Scheduled,
 M7-G2,3,CLE,BLD,reg,Scheduled,
 M7-G3,3,CLE,BLD,reg,Scheduled,
