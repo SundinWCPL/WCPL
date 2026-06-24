@@ -276,7 +276,7 @@ if (status === "cancelled") {
 } else if (played && hg != null && ag != null) {
   resultText = "FINAL";
   if (ot === 1) resultText = "FINAL (OT)";
-  else if (ot > 1) resultText = `FINAL (OT${ot})`;
+  else if (ot > 1) resultText = `FINAL (${ot}OT)`;
 }
 
 resultEl.textContent = resultText;
@@ -477,6 +477,50 @@ const ppg = (ppgCsv != null && Number.isFinite(ppgCsv))
   elGo.hidden = false;
 }
 
+function detectShotColorTeams(allShots, matchRows) {
+  const steamToTeam = new Map();
+
+  for (const r of matchRows || []) {
+    const sid = normalizeId(r.steam_id ?? r.steamid ?? r.steamID ?? r.steam ?? r.steam64);
+    const teamId = String(r.team_id ?? "").trim();
+    if (sid && teamId && !steamToTeam.has(sid)) {
+      steamToTeam.set(sid, teamId);
+    }
+  }
+
+  const scores = {
+    red: new Map(),
+    blue: new Map()
+  };
+
+  for (const s of allShots || []) {
+    const color = String(s.teamColor ?? "").trim().toLowerCase();
+    if (color !== "red" && color !== "blue") continue;
+
+    const sid = normalizeId(s.steamId);
+    const teamId = steamToTeam.get(sid);
+    if (!teamId) continue;
+
+    scores[color].set(teamId, (scores[color].get(teamId) || 0) + 1);
+  }
+
+  const bestTeam = (color, exclude = "") => {
+    const entries = [...scores[color].entries()]
+      .filter(([teamId]) => !exclude || teamId !== exclude)
+      .sort((a, b) => b[1] - a[1]);
+
+    return entries[0]?.[0] || "";
+  };
+
+  const redTeam = bestTeam("red");
+  const blueTeam = bestTeam("blue", redTeam);
+
+  return {
+    red: redTeam,
+    blue: blueTeam
+  };
+}
+
 function renderPlayedBoxscore(seasonId, homeTeam, awayTeam, matchRows, gameRow) {
   setText("homePlayedTitle", displayTeamName(homeTeam));
   setText("awayPlayedTitle", displayTeamName(awayTeam));
@@ -493,11 +537,23 @@ stars.forEach((s, i) => {
   renderGameTeamTables(seasonId, awayRows, T.awayGameSkaters, T.awayGameGoalies);
   
     // Shot maps (from games.csv shot_summary)
-  const allShots = parseShotSummary(gameRow?.shot_summary);
+const allShots = parseShotSummary(gameRow?.shot_summary);
 
-  // Convention: importer writes Red=home, Blue=away
-  const homeShots = allShots.filter(e => String(e.teamColor).trim().toLowerCase() === "red");
-  const awayShots = allShots.filter(e => String(e.teamColor).trim().toLowerCase() === "blue");
+const colorToTeamId = detectShotColorTeams(allShots, matchRows);
+
+const homeColor = Object.entries(colorToTeamId)
+  .find(([, teamId]) => teamId === homeTeam.team_id)?.[0];
+
+const awayColor = Object.entries(colorToTeamId)
+  .find(([, teamId]) => teamId === awayTeam.team_id)?.[0];
+
+const homeShots = allShots.filter(e =>
+  String(e.teamColor).trim().toLowerCase() === homeColor
+);
+
+const awayShots = allShots.filter(e =>
+  String(e.teamColor).trim().toLowerCase() === awayColor
+);
 
   renderShotMapPlotly({
     divId: "homeShotMap",
