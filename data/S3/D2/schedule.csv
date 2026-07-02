@@ -17,9 +17,9 @@ M5-G3,2,RCH,CLE,reg,final,2026-06-28
 M6-G1,3,BLM,BCK,reg,final,2026-06-30
 M6-G2,3,BLM,BCK,reg,final,2026-06-30
 M6-G3,3,BLM,BCK,reg,final,2026-06-30
-M7-G1,3,CLE,BLD,reg,Scheduled,
-M7-G2,3,CLE,BLD,reg,Scheduled,
-M7-G3,3,CLE,BLD,reg,Scheduled,
+M7-G1,3,CLE,BLD,reg,final,2026-07-01
+M7-G2,3,CLE,BLD,reg,final,2026-07-01
+M7-G3,3,CLE,BLD,reg,final,2026-07-01
 M8-G1,3,BCK,LGT,reg,Scheduled,
 M8-G2,3,BCK,LGT,reg,Scheduled,
 M8-G3,3,BCK,LGT,reg,Scheduled,
