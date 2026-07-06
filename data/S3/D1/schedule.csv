@@ -14,9 +14,9 @@ M4-G3,2,BCL,SEA,reg,final,2026-06-28
 M5-G1,2,TOR,PKN,reg,final,2026-06-26
 M5-G2,2,TOR,PKN,reg,final,2026-06-26
 M5-G3,2,TOR,PKN,reg,final,2026-06-26
-M6-G1,3,LL,NK,reg,Scheduled,
-M6-G2,3,LL,NK,reg,Scheduled,
-M6-G3,3,LL,NK,reg,Scheduled,
+M6-G1,3,LL,NK,reg,final,2026-07-05
+M6-G2,3,LL,NK,reg,final,2026-07-05
+M6-G3,3,LL,NK,reg,final,2026-07-05
 M7-G1,3,PKN,BCL,reg,Scheduled,
 M7-G2,3,PKN,BCL,reg,Scheduled,
 M7-G3,3,PKN,BCL,reg,Scheduled,
