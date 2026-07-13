@@ -32,9 +32,9 @@ M10-G3,4,BLD,BCK,reg,final,2026-07-08
 M11-G1,4,CLE,BLM,reg,final,2026-07-11
 M11-G2,4,CLE,BLM,reg,final,2026-07-11
 M11-G3,4,CLE,BLM,reg,final,2026-07-11
-M12-G1,4,LGT,RCH,reg,Scheduled,
-M12-G2,4,LGT,RCH,reg,Scheduled,
-M12-G3,4,LGT,RCH,reg,Scheduled,
+M12-G1,4,LGT,RCH,reg,final,2026-07-12
+M12-G2,4,LGT,RCH,reg,final,2026-07-12
+M12-G3,4,LGT,RCH,reg,final,2026-07-12
 M13-G1,5,BLM,BLD,reg,Scheduled,
 M13-G2,5,BLM,BLD,reg,Scheduled,
 M13-G3,5,BLM,BLD,reg,Scheduled,
