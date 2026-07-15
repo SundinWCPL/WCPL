@@ -20,12 +20,12 @@ M6-G3,3,VAN,CGY,reg,final,2026-07-12
 M12-G1,4,EVT,VIC,reg,final,2026-07-13
 M12-G2,4,EVT,VIC,reg,final,2026-07-13
 M12-G3,4,EVT,VIC,reg,final,2026-07-13
+M7-G1,4,VIC,VAN,reg,final,2026-07-14
+M7-G2,4,VIC,VAN,reg,final,2026-07-14
+M7-G3,4,VIC,VAN,reg,final,2026-07-14
 M3-G1,4,CGY,EVT,reg,Scheduled,
 M3-G2,4,CGY,EVT,reg,Scheduled,
 M3-G3,4,CGY,EVT,reg,Scheduled,
-M7-G1,4,VIC,VAN,reg,Scheduled,
-M7-G2,4,VIC,VAN,reg,Scheduled,
-M7-G3,4,VIC,VAN,reg,Scheduled,
 M9-G1,4,CGY,206,reg,Scheduled,
 M9-G2,4,CGY,206,reg,Scheduled,
 M9-G3,4,CGY,206,reg,Scheduled,
