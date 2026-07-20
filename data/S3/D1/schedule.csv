@@ -35,9 +35,9 @@ M12-G3,4,SEA,TOR,reg,final,2026-07-12
 M10-G1,5,BCL,NK,reg,Scheduled,
 M10-G2,5,BCL,NK,reg,Scheduled,
 M10-G3,5,BCL,NK,reg,Scheduled,
-M13-G1,5,LL,BCL,reg,Scheduled,
-M13-G2,5,LL,BCL,reg,Scheduled,
-M13-G3,5,LL,BCL,reg,Scheduled,
+M13-G1,5,LL,BCL,reg,final,2026-07-19
+M13-G2,5,LL,BCL,reg,final,2026-07-19
+M13-G3,5,LL,BCL,reg,final,2026-07-19
 M14-G1,5,TOR,NK,reg,Scheduled,
 M14-G2,5,TOR,NK,reg,Scheduled,
 M14-G3,5,TOR,NK,reg,Scheduled,
