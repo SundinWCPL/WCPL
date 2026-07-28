@@ -41,6 +41,9 @@ M13-G3,5,VAN,KLN,reg,final,2026-07-23
 M15-G1,5,VIC,CGY,reg,final,2026-07-22
 M15-G2,5,VIC,CGY,reg,final,2026-07-22
 M15-G3,5,VIC,CGY,reg,final,2026-07-22
+M18-G1,6,CGY,VAN,reg,final,2026-07-27
+M18-G2,6,CGY,VAN,reg,final,2026-07-27
+M18-G3,6,CGY,VAN,reg,final,2026-07-27
 M14-G1,6,EVT,206,reg,Scheduled,
 M14-G2,6,EVT,206,reg,Scheduled,
 M14-G3,6,EVT,206,reg,Scheduled,
@@ -50,9 +53,6 @@ M16-G3,6,EVT,KLN,reg,Scheduled,
 M17-G1,6,206,VIC,reg,Scheduled,
 M17-G2,6,206,VIC,reg,Scheduled,
 M17-G3,6,206,VIC,reg,Scheduled,
-M18-G1,6,CGY,VAN,reg,Scheduled,
-M18-G2,6,CGY,VAN,reg,Scheduled,
-M18-G3,6,CGY,VAN,reg,Scheduled,
 M19-G1,7,VAN,EVT,reg,Scheduled,
 M19-G2,7,VAN,EVT,reg,Scheduled,
 M19-G3,7,VAN,EVT,reg,Scheduled,
