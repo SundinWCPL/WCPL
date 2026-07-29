@@ -50,12 +50,12 @@ M16-G3,6,BLD,RCH,reg,final,2026-07-26
 M20-G1,7,CLE,RCH,reg,final,2026-07-27
 M20-G2,7,CLE,RCH,reg,final,2026-07-27
 M20-G3,7,CLE,RCH,reg,final,2026-07-27
+M18-G1,7,BCK,CLE,reg,final,2026-07-28
+M18-G2,7,BCK,CLE,reg,final,2026-07-28
+M18-G3,7,BCK,CLE,reg,final,2026-07-28
 M17-G1,7,BLM,LGT,reg,Scheduled,
 M17-G2,7,BLM,LGT,reg,Scheduled,
 M17-G3,7,BLM,LGT,reg,Scheduled,
-M18-G1,7,BCK,CLE,reg,Scheduled,
-M18-G2,7,BCK,CLE,reg,Scheduled,
-M18-G3,7,BCK,CLE,reg,Scheduled,
 M19-G1,7,LGT,BLD,reg,Scheduled,
 M19-G2,7,LGT,BLD,reg,Scheduled,
 M19-G3,7,LGT,BLD,reg,Scheduled,
