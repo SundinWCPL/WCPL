@@ -59,9 +59,9 @@ M16-G3,7,EVT,KLN,reg,final,2026-08-06
 M19-G1,7,VAN,EVT,reg,final,2026-08-07
 M19-G2,7,VAN,EVT,reg,final,2026-08-07
 M19-G3,7,VAN,EVT,reg,final,2026-08-07
-M20-G1,7,KLN,VIC,reg,Scheduled,
-M20-G2,7,KLN,VIC,reg,Scheduled,
-M20-G3,7,KLN,VIC,reg,Scheduled,
+M20-G1,7,KLN,VIC,reg,final,2026-08-10
+M20-G2,7,KLN,VIC,reg,final,2026-08-10
+M20-G3,7,KLN,VIC,reg,final,2026-08-10
 M22-G1,8,CGY,Hetero 2nd,sf,Scheduled,
 M22-G2,8,CGY,Hetero 2nd,sf,Scheduled,
 M22-G3,8,CGY,Hetero 2nd,sf,Scheduled,
