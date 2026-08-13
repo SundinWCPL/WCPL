@@ -74,9 +74,9 @@ M22-G3,8,BLD,CLE,reg,final,2026-08-06
 M27-G1,9,RCH,LGT,reg,final,2026-08-10
 M27-G2,9,RCH,LGT,reg,final,2026-08-10
 M27-G3,9,RCH,LGT,reg,final,2026-08-10
-M25-G1,9,BCK,BLD,reg,Scheduled,
-M25-G2,9,BCK,BLD,reg,Scheduled,
-M25-G3,9,BCK,BLD,reg,Scheduled,
+M25-G1,9,BCK,BLD,reg,final,2026-08-12
+M25-G2,9,BCK,BLD,reg,final,2026-08-12
+M25-G3,9,BCK,BLD,reg,final,2026-08-12
 M26-G1,9,BLM,CLE,reg,Scheduled,
 M26-G2,9,BLM,CLE,reg,Scheduled,
 M26-G3,9,BLM,CLE,reg,Scheduled,
