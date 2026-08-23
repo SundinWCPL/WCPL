@@ -83,12 +83,12 @@ M29-G3,10,BCK,RCH,reg,final,2026-08-19
 M30-G1,10,CLE,LGT,reg,final,2026-08-18
 M30-G2,10,CLE,LGT,reg,final,2026-08-18
 M30-G3,10,CLE,LGT,reg,final,2026-08-18
+M28-G1,10,BLD,BLM,reg,final,2026-08-22
+M28-G2,10,BLD,BLM,reg,final,2026-08-22
+M28-G3,10,BLD,BLM,reg,final,2026-08-22
 M26-G1,10,BLM,CLE,reg,Scheduled,
 M26-G2,10,BLM,CLE,reg,Scheduled,
 M26-G3,10,BLM,CLE,reg,Scheduled,
-M28-G1,10,BLD,BLM,reg,Scheduled,
-M28-G2,10,BLD,BLM,reg,Scheduled,
-M28-G3,10,BLD,BLM,reg,Scheduled,
 M31-G1,11,RCH,4th,sf,Scheduled,
 M31-G2,11,RCH,4th,sf,Scheduled,
 M31-G3,11,RCH,4th,sf,Scheduled,
