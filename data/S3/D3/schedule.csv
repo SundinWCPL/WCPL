@@ -70,8 +70,8 @@ M23-G5,8,EVT,206,sf,final,2026-08-16
 M22-G1,8,CGY,KLN,sf,final,2026-08-17
 M22-G2,8,CGY,KLN,sf,final,2026-08-17
 M22-G3,8,CGY,KLN,sf,final,2026-08-17
-M24-G1,9,CGY,EVT,f,Scheduled,
-M24-G2,9,CGY,EVT,f,Scheduled,
-M24-G3,9,CGY,EVT,f,Scheduled,
-M24-G4,9,CGY,EVT,f,Scheduled,
-M24-G5,9,CGY,EVT,f,Scheduled,
+M24-G1,9,CGY,EVT,f,final,2026-08-26
+M24-G2,9,CGY,EVT,f,final,2026-08-26
+M24-G3,9,CGY,EVT,f,final,2026-08-26
+M24-G4,9,CGY,EVT,f,final,2026-08-26
+M24-G5,9,CGY,EVT,f,final,2026-08-26
